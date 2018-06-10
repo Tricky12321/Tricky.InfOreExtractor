@@ -61,6 +61,7 @@ namespace Tricky.InfiniteOreExtractor
         private HashSet<CubeCoord> visitedLocations;
         private CubeCoord searchLocation;
         private float mrReadoutTick;
+        private int mnLowFrequencyUpdates;
         private int mnUpdates;
         private float mrTimeUntilFlash;
         private float mrTimeElapsed;
@@ -89,6 +90,8 @@ namespace Tricky.InfiniteOreExtractor
         private GameObject TutorialEffect;
         private GameObject LowPowerTutorial;
         private GameObject FullStorageTutorial;
+
+        private static InfOreExtractor ErroryExtractor;
 
         private Color mCubeColor;
         private string mMachineName;
@@ -163,6 +166,7 @@ namespace Tricky.InfiniteOreExtractor
             {
                 UpdateImportantCPH();
                 UpdatePlayerDistanceInfo();
+                ++mnLowFrequencyUpdates;
                 GameManager.mnNumOreExtractors_Transitory++;
                 mrNormalisedPower = mrCurrentPower / mrMaxPower;
                 mrSparePowerCapacity = mrMaxPower - mrCurrentPower;
@@ -418,11 +422,24 @@ namespace Tricky.InfiniteOreExtractor
                         ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfOre;
                     if (meState == eState.eOutOfStorageVeinDepleted)
                         ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfOre;
+                    ErroryExtractor = this;
+                }
+                else if (ErroryExtractor == this)
+                {
+                    ErroryExtractor = null;
+                    ARTHERPetSurvival.OreErrorTime = 0.0f;
                 }
 
                 if (mrIssueTime <= 300.0)
                     return;
                 ++GameManager.mnNumOreExtractors_With_Issues_Transitory;
+            }
+            else
+            {
+                if (ErroryExtractor != this)
+                    return;
+                OreExtractor.ErroryExtractor = null;
+                ARTHERPetSurvival.OreErrorTime = 0.0f;
             }
         }
 
@@ -1899,34 +1916,27 @@ namespace Tricky.InfiniteOreExtractor
             }
             else
             {
-                GameObject gameObject = holoMachineEntity.VisualisationObjects[0].transform.Search("Drill Rot").gameObject;
-                gameObject.GetComponent<RotateConstantlyScript>().ZRot *= 0.9f;
-                float num = 1f;
+                GameObject gameObject1 = holoMachineEntity.VisualisationObjects[0].transform.Search("Drill Rot").gameObject;
+                gameObject1.GetComponent<RotateConstantlyScript>().ZRot *= 0.9f;
+                float r = 1f;
                 if (holobase.mnUpdates % 60 < 30)
-                {
-                    num = 0f;
-                }
-
-                Color lCol = new Color(num, 0f, 0f, 1f);
+                    r = 0.0f;
+                Color lCol = new Color(r, 0.0f, 0.0f, 1f);
                 if (meState == eState.eDrillStuck)
-                {
-                    lCol = new Color(num, 1f - num, 0f, 1f);
-                }
-
+                    lCol = new Color(r, 1f - r, 0.0f, 1f);
                 if (meState == eState.eOutOfPower)
-                {
-                    lCol = new Color(num, 0f, 1f - num, 1f);
-                }
-
+                    lCol = new Color(r, 0.0f, 1f - r, 1f);
                 if (meState == eState.eOutOfStorage)
-                {
-                    lCol = new Color(num, 1f - num, 1f - num, 1f);
-                }
-
+                    lCol = new Color(r, 1f - r, 1f - r, 1f);
                 holobase.SetColour(holoMachineEntity.VisualisationObjects[0], lCol);
-                gameObject = gameObject.transform.Search("Drill GFX").gameObject;
-                holobase.SetTint(gameObject, new Color(1f - num, 0f, 0f, 1f));
+                GameObject gameObject2 = gameObject1.transform.Search("Drill GFX").gameObject;
+                holobase.SetTint(gameObject2, new Color(1f - r, 0.0f, 0.0f, 1f));
             }
+            if (ErroryExtractor != this)
+                return;
+            int num = mnLowFrequencyUpdates % 3 + 1;
+            holoMachineEntity.VisualisationObjects[0].transform.localScale = new Vector3(num, num, num);
+            holobase.SetColour(holoMachineEntity.VisualisationObjects[0], new Color(num, 0.1f, 0.1f));
         }
 
         public string Name

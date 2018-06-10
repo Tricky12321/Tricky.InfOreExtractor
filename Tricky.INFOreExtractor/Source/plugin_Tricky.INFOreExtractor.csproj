@@ -51,7 +51,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="PaypalLink.txt" />
-    <Content Include="SteamPreview.png" />
     <Content Include="Xml\ManufacturerRecipes.xml" />
     <Content Include="Xml\TerrainData.xml" />
   </ItemGroup>
@@ -66,7 +65,6 @@
 copy $(TargetPath) %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1
 xcopy "$(ProjectDir)\Xml" %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1\Xml\ /Y /E /Q
 copy $(ProjectDir)\mod.config %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1
-copy $(ProjectDir)\SteamPreview.png %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor
 copy $(ProjectDir)\WorkshopFileId.config %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor
 </PostBuildEvent>
   </PropertyGroup>
