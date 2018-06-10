@@ -4,3 +4,4 @@
 to some odd mojo with the preview image. Mod had to be uploaded through SteamCMD using the included .vdf file with preview
 image parameter ommitted.
 
+- Mad Vandal
