@@ -56,7 +56,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="mod.config" />
-    <None Include="Tricky.INFOreExtractor.vdf" />
     <None Include="WorkshopFileId.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
