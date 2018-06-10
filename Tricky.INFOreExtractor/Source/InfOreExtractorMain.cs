@@ -1,37 +1,59 @@
-public class InfOreExtractorMain : FortressCraftMod
+using System;
+using MadVandal.FortressCraft;
+
+namespace Tricky.InfiniteOreExtractor
 {
-	public ushort mHopperCubeType;
+    public class InfOreExtractorMain : FortressCraftMod
+    {
+        private const string MOD_KEY = "Tricky.InfOreExtractor";
 
-	public static InfExtractorMachineWindow InfExtractorUI = new InfExtractorMachineWindow();
+        private const string MOD_CUBE_KEY = "Tricky.InfOreExtractor";
 
-	private void Start()
-	{
-		Variables.Start();
-	}
+        private ushort mCubeType;
 
-	public override ModRegistrationData Register()
-	{
-		ModRegistrationData modRegistrationData = new ModRegistrationData();
-		modRegistrationData.RegisterEntityHandler("Tricky.InfOreExtractor");
-		modRegistrationData.RegisterEntityUI("Tricky.InfOreExtractor", InfOreExtractorMain.InfExtractorUI);
-		UIManager.NetworkCommandFunctions.Add("InfExtractorMachineWindow", InfExtractorMachineWindow.HandleNetworkCommand);
-		TerrainDataEntry terrainDataEntry = default(TerrainDataEntry);
-		TerrainDataValueEntry terrainDataValueEntry = default(TerrainDataValueEntry);
-		TerrainData.GetCubeByKey("Tricky.InfOreExtractor", out terrainDataEntry, out terrainDataValueEntry);
-		if (terrainDataEntry != null)
-		{
-			this.mHopperCubeType = terrainDataEntry.CubeType;
-		}
-		return modRegistrationData;
-	}
+        public override ModRegistrationData Register()
+        {
+            try
+            {
+                Logging.ModName = "Tricky! Infinite Ore Extractor";
 
-	public override ModCreateSegmentEntityResults CreateSegmentEntity(ModCreateSegmentEntityParameters parameters)
-	{
-		ModCreateSegmentEntityResults modCreateSegmentEntityResults = new ModCreateSegmentEntityResults();
-		if (parameters.Cube == this.mHopperCubeType)
-		{
-			modCreateSegmentEntityResults.Entity = new InfOreExtractor(parameters.Segment, parameters.X, parameters.Y, parameters.Z, parameters.Cube, parameters.Flags, parameters.Value, parameters.LoadFromDisk);
-		}
-		return modCreateSegmentEntityResults;
-	}
+                ModRegistrationData modRegistrationData = new ModRegistrationData();
+                modRegistrationData.RegisterEntityHandler(MOD_KEY);
+                modRegistrationData.RegisterEntityUI(MOD_KEY, new InfExtractorMachineWindow());
+                UIManager.NetworkCommandFunctions.Add(InfExtractorMachineWindow.InterfaceName, InfExtractorMachineWindow.HandleNetworkCommand);
+                TerrainDataEntry terrainDataEntry;
+                TerrainDataValueEntry terrainDataValueEntry = default(TerrainDataValueEntry);
+                TerrainData.GetCubeByKey(MOD_CUBE_KEY, out terrainDataEntry, out terrainDataValueEntry);
+                if (terrainDataEntry != null)
+                    mCubeType = terrainDataEntry.CubeType;
+                else 
+                    Logging.LogMissingCubeKey(MOD_CUBE_KEY);
+
+                return modRegistrationData;
+            }
+            catch (Exception e)
+            {
+                Logging.LogException(e);
+                return new ModRegistrationData();
+            }
+        }
+
+        public override ModCreateSegmentEntityResults CreateSegmentEntity(ModCreateSegmentEntityParameters parameters)
+        {
+            ModCreateSegmentEntityResults modCreateSegmentEntityResults = new ModCreateSegmentEntityResults();
+
+            try
+            {
+                if (parameters.Cube == mCubeType)
+                    modCreateSegmentEntityResults.Entity = new InfOreExtractor(parameters.Segment, parameters.X, parameters.Y, parameters.Z, parameters.Cube, parameters.Flags,
+                        parameters.Value, parameters.LoadFromDisk);
+            }
+            catch (Exception e)
+            {
+                Logging.LogException(e);
+            }
+
+            return modCreateSegmentEntityResults;
+        }
+    }
 }

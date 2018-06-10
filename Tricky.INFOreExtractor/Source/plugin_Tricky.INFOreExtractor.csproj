@@ -6,9 +6,10 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <OutputType>Library</OutputType>
     <AssemblyName>plugin_Tricky.INFOreExtractor</AssemblyName>
-    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -25,29 +26,48 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
   </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace>Tricky.InfiniteOreExtractor</RootNamespace>
+  </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Assembly-CSharp">
+    <Reference Include="Assembly-CSharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Assembly-CSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>..\UnityEngine.dll</HintPath>
-    </Reference>
-    <Reference Include="MadVandal.ESMSModInterfaces">
-      <HintPath>C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\MadVandal.ESMSModInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="System">
       <HintPath>C:\WINDOWS\assembly\GAC_MSIL\System\2.0.0.0__b77a5c561934e089\System.dll</HintPath>
     </Reference>
-    <Reference Include="System.Core">
-      <HintPath>C:\WINDOWS\assembly\GAC_MSIL\System.Core\3.5.0.0__b77a5c561934e089\System.Core.dll</HintPath>
+    <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="InfExtractorMachineWindow.cs" />
     <Compile Include="InfOreExtractor.cs" />
     <Compile Include="InfOreExtractorMain.cs" />
+    <Compile Include="Logging.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Variables.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="PaypalLink.txt" />
+    <Content Include="SteamPreview.png" />
+    <Content Include="Xml\ManufacturerRecipes.xml" />
+    <Content Include="Xml\TerrainData.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="mod.config" />
+    <None Include="Tricky.INFOreExtractor.vdf" />
+    <None Include="WorkshopFileId.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>if not exist %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1 mkdir %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1
+copy $(TargetPath) %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1
+xcopy "$(ProjectDir)\Xml" %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1\Xml\ /Y /E /Q
+copy $(ProjectDir)\mod.config %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1
+copy $(ProjectDir)\SteamPreview.png %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor
+copy $(ProjectDir)\WorkshopFileId.config %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor
+</PostBuildEvent>
+  </PropertyGroup>
 </Project>

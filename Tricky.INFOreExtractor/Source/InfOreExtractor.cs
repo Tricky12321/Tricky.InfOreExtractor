@@ -1,2198 +1,2078 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using MadVandal.FortressCraft;
 using UnityEngine;
+using Object = UnityEngine.Object;
+using Random = UnityEngine.Random;
 
-public class InfOreExtractor : MachineEntity, PowerConsumerInterface, StorageSupplierInterface
+namespace Tricky.InfiniteOreExtractor
 {
-    private enum eDrillHeadType
+    /// <summary>
+    /// Infinite Ore Extractor.
+    /// </summary>
+    public class InfOreExtractor : MachineEntity, PowerConsumerInterface, StorageSupplierInterface, OreExtractorInterface
     {
-        eDefault = 1,
-        eSteel,
-        eCrystal,
-        eOrganic,
-        ePlasma
-    }
-
-    public enum eState
-    {
-        eFetchingEntryPoint,
-        eFetchingExtractionPoint,
-        eSearchingForOre,
-        eMining,
-        eOutOfPower,
-        eOutOfStorage,
-        eVeinDepleted,
-        eOutOfPowerVeinDepleted,
-        eOutOfStorageVeinDepleted,
-        eDrillStuck,
-        eIdle
-    }
-
-    public const ushort MIN_ORE_VALUE = 1;
-    public const ushort MAX_ORE_VALUE = 2560;
-    public const int MAX_SEARCH_STEPS = 16384;
-    public const float EXTRACTION_TIME = 30f;
-    public const float POWER_TRANSFER_RATE = 60f;
-    public const int MAX_DURABILITY = 10000;
-    public const float CUTTER_EFFICIENCY_T1 = 0.1f;
-    public const float CUTTER_EFFICIENCY_T2 = 0.2f;
-    public const float CUTTER_EFFICIENCY_T3 = 0.3f;
-    public const float CUTTER_EFFICIENCY_T4 = 0.5f;
-    public const float CUTTER_EFFICIENCY_T5 = 4f;
-    public const int CUTTER_HARDNESS_T1 = 150;
-    public const int CUTTER_HARDNESS_T2 = 250;
-    public const int CUTTER_HARDNESS_T3 = 250;
-    public const int CUTTER_HARDNESS_T4 = 250;
-    public const int CUTTER_HARDNESS_T5 = 250;
-    public const int DRILLMOTOR_RATE_T0 = 1;
-    public const int DRILLMOTOR_RATE_T1 = 2;
-    public const int DRILLMOTOR_RATE_T2 = 4;
-    public const int DRILLMOTOR_RATE_T3 = 8;
-    public const int DRILLMOTOR_RATE_T4 = 16;
-    public const int DRILLMOTOR_RATE_T5 = 32;
-    public int mnDrillRate = 1;
-    private int mnVisualCutterTier = -1;
-    public int mnDrillTier;
-    public int mnCutterTier = 1;
-    public int mnCutterDurability;
-    public int mnCutterMaxDurability;
-    private float mrTargetPitch;
-    public float mrMaxPower = 500f;
-    public float mrCurrentPower;
-    private int mnMaxOre = 25;
-    public int mnStoredOre;
-    public ushort mnOreType;
-    public float mrTimeUntilNextOre;
-    public int mnEstimatedOreLeft;
-    public float mrEfficiency;
-    public float mrWorkTime;
-    public float mrIdleTime;
-    public float mrWorkEfficiency;
-    public float mrNormalisedPower;
-    public float OreCollectionRate = 1f;
-    private long ExtractionX;
-    private long ExtractionY;
-    private long ExtractionZ;
-    private long EntryX;
-    private long EntryY;
-    private long EntryZ;
-    public eState meState;
-    public float mrExtractionTime = 30f;
-    public float mrPowerUsage = 0.5f;
-    public float mrSparePowerCapacity;
-    private Queue<CubeCoord> queuedLocations;
-    private HashSet<CubeCoord> visitedLocations;
-    private CubeCoord searchLocation;
-    private float mrReadoutTick;
-    private int mnLowFrequencyUpdates;
-    private int mnUpdates;
-    private float mrTimeUntilFlash;
-    private float mrTimeElapsed;
-    private int mnDepleteCount;
-    public int mnBonusOre;
-    public int mnBonusDeplete;
-    private bool mbRotateModel;
-    private Quaternion mTargetRotation = Quaternion.identity;
-    private bool mbLinkedToGO;
-    public GameObject MiningSparks;
-    public GameObject DrillChunks;
-    public GameObject OreExtractorModel;
-    private RotateConstantlyScript mRotCont;
-    private GameObject DrillHeadObject;
-    private Renderer OreExtractorBarThing;
-    public MaterialPropertyBlock mPowerMPB;
-    public TextMesh DebugReadout;
-    private Light WorkLight;
-    public float mrAveragePPS;
-    public string mName = string.Empty;
-    private int mnSign;
-    private int lnCutter;
-    public float mrIssueTime;
-    public bool mbReportOffline = true;
-    private float base_efficiency;
-    private GameObject TutorialEffect;
-    private GameObject LowPowerTutorial;
-    private GameObject FullStorageTutorial;
-    public static int STEEL_HEAD_ID = 200;
-    public static int CRYSTAL_HEAD_ID = 201;
-    public static int ORGANIC_HEAD_ID = 202;
-    public static int PLASMA_HEAD_ID = 203;
-
-    private Color mCubeColor;
-    private int CubeValue;
-    private string MachineName;
-    private int TierUpgrade = 0;
-
-    public InfOreExtractor(Segment segment, long x, long y, long z, ushort cube, byte flags, ushort lValue, bool wasLoaded) : base(eSegmentEntity.Mod, SpawnableObjectEnum.OreExtractor, x, y, z, cube, flags, lValue, Vector3.zero, segment)
-    {
-        base.mbNeedsLowFrequencyUpdate = true;
-        base.mbNeedsUnityUpdate = true;
-        this.mrTimeUntilNextOre = this.mrExtractionTime;
-        this.searchLocation = CubeCoord.Invalid;
-        this.mnOreType = 0;
-        string cubeKey = TerrainData.GetCubeKey(cube, lValue);
-        if (cubeKey == "Tricky.StockInfOreExtractor")
+        public enum eState
         {
-            this.TierUpgrade = 0;
-            this.MachineName = "Stock Infinte Ore Extractor";
-            this.mCubeColor = new Color(2f, 0.5f, 0.5f);
-            this.CubeValue = 0;
+            eFetchingEntryPoint,
+            eFetchingExtractionPoint,
+            eSearchingForOre,
+            eMining,
+            eOutOfPower,
+            eOutOfStorage,
+            eVeinDepleted,
+            eOutOfPowerVeinDepleted,
+            eOutOfStorageVeinDepleted,
+            eDrillStuck,
+            eIdle
         }
-        if (cubeKey == "Tricky.AdvancedInfOreExtractor")
-        {
-            this.TierUpgrade = 1;
-            this.MachineName = "Advanced Infinte Ore Extractor";
-            this.mCubeColor = new Color(0.5f, 0.5f, 4.5f);
-            this.CubeValue = 1;
-        }
-        if (!wasLoaded)
-        {
-            this.SetNewState(eState.eFetchingEntryPoint);
-        }
-        else
-        {
-            this.SetNewState(eState.eFetchingExtractionPoint);
-        }
-        this.mnCutterTier = 1;
-        if (!segment.mbValidateOnly)
-        {
-            this.CalculateEfficiency();
-            this.SetTieredUpgrade(0);
-        }
-    }
 
-    public override void CleanUp()
-    {
-        base.CleanUp();
-        this.queuedLocations = null;
-        this.visitedLocations = null;
-    }
+        public int mnDrillRate = 1;
+        private int mnVisualCutterTier = -1;
+        public int mnDrillTier;
+        public int mnCutterTier = 1;
+        public int mnCutterDurability;
+        private float mrTargetPitch;
+        public float mrMaxPower = 500f;
+        public float mrCurrentPower;
+        private int mnMaxOre = 25;
+        public int mnStoredOre;
+        public ushort mnOreType;
+        public float mrTimeUntilNextOre;
+        public int mnEstimatedOreLeft;
+        public float mrEfficiency;
+        public float mrWorkTime;
+        public float mrIdleTime;
+        public float mrWorkEfficiency;
+        public float mrNormalisedPower;
+        public float OreCollectionRate = 1f;
+        private long ExtractionX;
+        private long ExtractionY;
+        private long ExtractionZ;
+        private long EntryX;
+        private long EntryY;
+        private long EntryZ;
+        public eState meState;
+        public float mrExtractionTime = 30f;
+        public float mrPowerUsage = 0.5f;
+        public float mrSparePowerCapacity;
+        private Queue<CubeCoord> queuedLocations;
+        private HashSet<CubeCoord> visitedLocations;
+        private CubeCoord searchLocation;
+        private float mrReadoutTick;
+        private int mnUpdates;
+        private float mrTimeUntilFlash;
+        private float mrTimeElapsed;
+        private int mnDepleteCount;
+        public int mnBonusOre;
+        public int mnBonusDeplete;
+        private bool mbRotateModel;
+        private Quaternion mTargetRotation = Quaternion.identity;
+        private bool mbLinkedToGO;
+        public GameObject MiningSparks;
+        public GameObject DrillChunks;
+        public GameObject OreExtractorModel;
+        private RotateConstantlyScript mRotCont;
+        private GameObject DrillHeadObject;
+        private Renderer OreExtractorBarThing;
+        public MaterialPropertyBlock mPowerMPB;
+        public TextMesh DebugReadout;
+        private Light WorkLight;
+        public float mrAveragePPS;
+        public string mName = string.Empty;
+        private int mnSign;
+        private int lnCutter;
+        public float mrIssueTime;
+        public bool mbReportOffline = true;
+        private float base_efficiency;
+        private GameObject TutorialEffect;
+        private GameObject LowPowerTutorial;
+        private GameObject FullStorageTutorial;
 
-    public override void LowFrequencyUpdate()
-    {
-        float num = this.mrCurrentPower;
-        this.UpdatePlayerDistanceInfo();
-        this.mnLowFrequencyUpdates++;
-        GameManager.mnNumOreExtractors_Transitory++;
-        this.mrNormalisedPower = this.mrCurrentPower / this.mrMaxPower;
-        this.mrSparePowerCapacity = this.mrMaxPower - this.mrCurrentPower;
-        this.mrReadoutTick -= LowFrequencyThread.mrPreviousUpdateTimeStep;
-        if (this.mrReadoutTick < 0f)
-        {
-            this.mrReadoutTick = 5f;
-        }
-        this.UpdateState();
-        float num2 = num - this.mrCurrentPower;
-        num2 /= LowFrequencyThread.mrPreviousUpdateTimeStep;
-        this.mrAveragePPS += (num2 - this.mrAveragePPS) / 8f;
-        if (this.mnCutterTier == 1)
-        {
-            this.LookForCutterHead();
-        }
-        this.LookForSign();
-    }
+        private Color mCubeColor;
+        private string mMachineName;
+        private int mTierUpgrade;
 
-    private bool AttemptAutoUpgrade(int lnID, StorageMachineInterface storageHopper)
-    {
-        ItemBase itemBase = default(ItemBase);
-        if (storageHopper.TryExtractItems((StorageUserInterface)this, lnID, 1, out itemBase))
+        public InfOreExtractor(Segment segment, long x, long y, long z, ushort cube, byte flags, ushort lValue, bool wasLoaded) : base(eSegmentEntity.Mod, SpawnableObjectEnum.OreExtractor, x, y,
+            z, cube, flags, lValue, Vector3.zero, segment)
         {
-            ItemDurability itemDurability = itemBase as ItemDurability;
-            if (itemDurability != null)
+            try
             {
-                Achievements.UnlockAchievementDelayed(Achievements.eAchievements.eOpinionsareLike);
-                this.SetCutterUpgrade(itemDurability);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void LookForSign()
-    {
-        if (!((Object)FloatingCombatTextManager.instance == (Object)null))
-        {
-            this.mnSign++;
-            long num = base.mnX;
-            long num2 = base.mnY;
-            long num3 = base.mnZ;
-            if (this.mnSign % 6 == 0)
-            {
-                num--;
-            }
-            if (this.mnSign % 6 == 1)
-            {
-                num++;
-            }
-            if (this.mnSign % 6 == 2)
-            {
-                num2--;
-            }
-            if (this.mnSign % 6 == 3)
-            {
-                num2++;
-            }
-            if (this.mnSign % 6 == 4)
-            {
-                num3--;
-            }
-            if (this.mnSign % 6 == 5)
-            {
-                num3++;
-            }
-            Segment segment = base.AttemptGetSegment(num, num2, num3);
-            if (segment != null && segment.IsSegmentInAGoodState())
-            {
-                Sign sign = segment.SearchEntity(num, num2, num3) as Sign;
-                if (sign != null)
+                mbNeedsLowFrequencyUpdate = true;
+                mbNeedsUnityUpdate = true;
+                mrTimeUntilNextOre = mrExtractionTime;
+                searchLocation = CubeCoord.Invalid;
+                mnOreType = 0;
+                string cubeKey = TerrainData.GetCubeKey(cube, lValue);
+                if (cubeKey == "Tricky.StockInfOreExtractor")
                 {
-                    if (!(this.mName == string.Empty) && !(this.mName != sign.mText))
-                    {
-                        return;
-                    }
-                    this.mName = sign.mText;
-                    FloatingCombatTextManager.instance.QueueText(base.mnX, base.mnY, base.mnZ, 0.75f, this.mName, Color.green, 1f, 16f);
+                    mTierUpgrade = 0;
+                    mMachineName = "Stock Infinite Ore Extractor";
+                    mCubeColor = new Color(2f, 0.5f, 0.5f);
+                }
+
+                if (cubeKey == "Tricky.AdvancedInfOreExtractor")
+                {
+                    mTierUpgrade = 1;
+                    mMachineName = "Advanced Infinite Ore Extractor";
+                    mCubeColor = new Color(0.5f, 0.5f, 4.5f);
+                }
+
+                SetNewState(!wasLoaded ? eState.eFetchingEntryPoint : eState.eFetchingExtractionPoint);
+
+                mnCutterTier = 1;
+                if (!segment.mbValidateOnly)
+                {
+                    CalculateEfficiency();
+                    SetTieredUpgrade(0);
                 }
             }
+            catch (Exception e)
+            {
+                Logging.LogException(e);
+            }
         }
-    }
 
-    private void LookForCutterHead()
-    {
-        if (WorldScript.mbIsServer)
+
+        public override void CleanUp()
         {
-            this.lnCutter++;
-            long num = base.mnX;
-            long num2 = base.mnY;
-            long num3 = base.mnZ;
-            if (this.lnCutter % 6 == 0)
+            base.CleanUp();
+            queuedLocations = null;
+            visitedLocations = null;
+        }
+
+
+        private void UpdateImportantCPH()
+        {
+            if (DifficultySettings.mbImportantCPH && CentralPowerHub.Destroyed)
             {
-                num--;
+                mrCurrentPower *= 0.95f;
+                mrNormalisedPower = mrCurrentPower / mrMaxPower;
             }
-            if (this.lnCutter % 6 == 1)
+
+            if (!Achievements.CheatsOn || Achievements.CHEAT_BaseBrownout <= 0.0)
+                return;
+            mrCurrentPower *= 0.95f;
+        }
+
+
+        public override void LowFrequencyUpdate()
+        {
+            try
             {
-                num++;
+                UpdateImportantCPH();
+                UpdatePlayerDistanceInfo();
+                GameManager.mnNumOreExtractors_Transitory++;
+                mrNormalisedPower = mrCurrentPower / mrMaxPower;
+                mrSparePowerCapacity = mrMaxPower - mrCurrentPower;
+                mrReadoutTick -= LowFrequencyThread.mrPreviousUpdateTimeStep;
+                if (mrReadoutTick < 0f)
+                    mrReadoutTick = 5f;
+                UpdateState();
+                mrAveragePPS += (float) (((mrCurrentPower - mrCurrentPower) / LowFrequencyThread.mrPreviousUpdateTimeStep - (double) mrAveragePPS) / 8.0);
+                if (mnCutterTier == 1)
+                    LookForCutterHead();
+                LookForSign();
             }
-            if (this.lnCutter % 6 == 2)
+            catch (Exception e)
             {
-                num2--;
+                Logging.LogException(e);
             }
-            if (this.lnCutter % 6 == 3)
+        }
+
+        private bool AttemptAutoUpgrade(int lnID, StorageMachineInterface storageHopper)
+        {
+            ItemBase itemBase;
+            if (storageHopper.TryExtractItems(this, lnID, 1, out itemBase))
             {
-                num2++;
-            }
-            if (this.lnCutter % 6 == 4)
-            {
-                num3--;
-            }
-            if (this.lnCutter % 6 == 5)
-            {
-                num3++;
-            }
-            Segment segment = base.AttemptGetSegment(num, num2, num3);
-            if (segment != null && segment.IsSegmentInAGoodState())
-            {
-                StorageMachineInterface storageMachineInterface = segment.SearchEntity(num, num2, num3) as StorageMachineInterface;
-                if (storageMachineInterface != null)
+                ItemDurability itemDurability = itemBase as ItemDurability;
+                if (itemDurability != null)
                 {
-                    eHopperPermissions permissions = storageMachineInterface.GetPermissions();
-                    if (permissions != 0 && permissions != eHopperPermissions.RemoveOnly)
+                    Achievements.UnlockAchievementDelayed(Achievements.eAchievements.eOpinionsareLike);
+                    SetCutterUpgrade(itemDurability);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void LookForSign()
+        {
+            if (!(FloatingCombatTextManager.instance == null))
+            {
+                mnSign++;
+                long num = mnX;
+                long num2 = mnY;
+                long num3 = mnZ;
+                if (mnSign % 6 == 0)
+                {
+                    num--;
+                }
+
+                if (mnSign % 6 == 1)
+                {
+                    num++;
+                }
+
+                if (mnSign % 6 == 2)
+                {
+                    num2--;
+                }
+
+                if (mnSign % 6 == 3)
+                {
+                    num2++;
+                }
+
+                if (mnSign % 6 == 4)
+                {
+                    num3--;
+                }
+
+                if (mnSign % 6 == 5)
+                {
+                    num3++;
+                }
+
+                Segment segment = AttemptGetSegment(num, num2, num3);
+                if (segment != null && segment.IsSegmentInAGoodState())
+                {
+                    Sign sign = segment.SearchEntity(num, num2, num3) as Sign;
+                    if (sign != null)
                     {
-                        return;
-                    }
-                    if (this.AttemptAutoUpgrade(OreExtractor.PLASMA_HEAD_ID, storageMachineInterface) || (!this.AttemptAutoUpgrade(OreExtractor.ORGANIC_HEAD_ID, storageMachineInterface) && (this.AttemptAutoUpgrade(OreExtractor.CRYSTAL_HEAD_ID, storageMachineInterface) || !this.AttemptAutoUpgrade(OreExtractor.STEEL_HEAD_ID, storageMachineInterface))))
-                    {
-                        ;
+                        if (!(mName == string.Empty) && !(mName != sign.mText))
+                        {
+                            return;
+                        }
+
+                        mName = sign.mText;
+                        FloatingCombatTextManager.instance.QueueText(mnX, mnY, mnZ, 0.75f, mName, Color.green, 1f, 16f);
                     }
                 }
             }
         }
-    }
 
-    public void UpdateState()
-    {
-        if (this.meState == eState.eOutOfStorage)
-        {
-            if (this.mnStoredOre + this.mnDrillRate + this.mnBonusOre < this.mnMaxOre)
-            {
-                this.SetNewState(eState.eMining);
-            }
-            this.mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-        }
-        else if (this.meState == eState.eOutOfStorageVeinDepleted)
-        {
-            if (this.mnStoredOre + this.mnDrillRate + this.mnBonusOre < this.mnMaxOre)
-            {
-                this.SetNewState(eState.eVeinDepleted);
-            }
-            else
-            {
-                this.mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-            }
-        }
-        if (this.meState != eState.eDrillStuck)
-        {
-
-        }
-        if (this.meState == eState.eFetchingEntryPoint)
-        {
-            this.UpdateFetchEntryPoint();
-        }
-        if (this.meState == eState.eFetchingExtractionPoint)
-        {
-            this.UpdateFetchExtractionPoint();
-        }
-        if (this.meState == eState.eSearchingForOre)
-        {
-            this.DoVeinSearch();
-        }
-        if (this.meState == eState.eMining)
-        {
-            this.UpdateMining();
-            this.mrIssueTime = 0f;
-            this.mrWorkTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-        }
-        else
-        {
-            this.mrIdleTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-        }
-        float num = this.mrWorkTime + this.mrIdleTime;
-        this.mrWorkEfficiency = this.mrWorkTime / num;
-        if (this.meState == eState.eVeinDepleted)
-        {
-            this.UpdateVeinDepleted();
-            this.mrIssueTime = 0f;
-        }
-        if (this.meState == eState.eOutOfPower)
-        {
-            this.mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-            if (this.mrCurrentPower > this.mrPowerUsage)
-            {
-                this.SetNewState(eState.eMining);
-            }
-        }
-        if (this.meState == eState.eOutOfPowerVeinDepleted)
-        {
-            this.mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-            if (this.mrCurrentPower > this.mrPowerUsage)
-            {
-                this.SetNewState(eState.eVeinDepleted);
-            }
-        }
-        if (this.meState == eState.eIdle)
-        {
-            this.mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-            if (base.mFrustrum != null)
-            {
-                base.DropMachineFrustrum();
-            }
-        }
-        if (this.meState == eState.eDrillStuck)
-        {
-            this.mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
-        }
-        if (this.mrIssueTime > 300f && this.mbReportOffline)
-        {
-            if (this.mrIssueTime > ARTHERPetSurvival.OreErrorTime && this.mnOreType != 0)
-            {
-                ARTHERPetSurvival.OreErrorTime = this.mrIssueTime;
-                ARTHERPetSurvival.OreErrorType = this.mnOreType;
-                ARTHERPetSurvival.ExtractorName = this.mName;
-            }
-            GameManager.mnNumOreExtractors_With_Issues_Transitory++;
-        }
-    }
-
-    public void UpdateFetchEntryPoint()
-    {
-        this.EntryX = (this.EntryY = (this.EntryZ = 0L));
-        Vector3 directionVector = CubeHelper.GetDirectionVector((byte)(base.mFlags & 0x3F));
-        if (this.CheckNeighbourEntryCube(directionVector))
-        {
-            if (this.EntryX != 0)
-            {
-                this.RotateExtractorTo(directionVector);
-            }
-        }
-        else
-        {
-            Vector3 forward = SegmentCustomRenderer.GetRotationQuaternion(base.mFlags) * Vector3.forward;
-            forward.Normalize();
-            if (!this.CheckNeighbourEntryCube(forward))
-            {
-                if (this.CheckNeighbourEntryCube(Vector3.forward))
-                {
-                    if (this.EntryX != 0)
-                    {
-                        this.RotateExtractorTo(Vector3.forward);
-                    }
-                }
-                else if (this.CheckNeighbourEntryCube(Vector3.back))
-                {
-                    if (this.EntryX != 0)
-                    {
-                        this.RotateExtractorTo(Vector3.back);
-                    }
-                }
-                else if (this.CheckNeighbourEntryCube(Vector3.left))
-                {
-                    if (this.EntryX != 0)
-                    {
-                        this.RotateExtractorTo(Vector3.left);
-                    }
-                }
-                else if (this.CheckNeighbourEntryCube(Vector3.right))
-                {
-                    if (this.EntryX != 0)
-                    {
-                        this.RotateExtractorTo(Vector3.right);
-                    }
-                }
-                else if (this.CheckNeighbourEntryCube(Vector3.down))
-                {
-                    if (this.EntryX != 0)
-                    {
-                        this.RotateExtractorTo(Vector3.down);
-                    }
-                }
-                else if (this.CheckNeighbourEntryCube(Vector3.up))
-                {
-                    if (this.EntryX != 0)
-                    {
-                        this.RotateExtractorTo(Vector3.up);
-                    }
-                }
-                else
-                {
-                    this.EntryX = (this.EntryY = (this.EntryZ = 0L));
-                    this.ExtractionX = (this.ExtractionY = (this.ExtractionZ = 0L));
-                    this.SetNewState(eState.eIdle);
-                }
-            }
-        }
-    }
-
-    private bool CheckNeighbourEntryCube(Vector3 forward)
-    {
-        long num = base.mnX + (long)forward.x;
-        long num2 = base.mnY + (long)forward.y;
-        long num3 = base.mnZ + (long)forward.z;
-        ushort cube = WorldScript.instance.GetCube(num, num2, num3);
-        if (cube == 0)
+        private void LookForCutterHead()
         {
             if (WorldScript.mbIsServer)
             {
-                SegmentManagerThread.instance.RequestSegmentForMachineFrustrum(base.mFrustrum, num, num2, num3);
-            }
-            return true;
-        }
-        if (CubeHelper.IsOre(cube))
-        {
-            this.EntryX = num;
-            this.EntryY = num2;
-            this.EntryZ = num3;
-            this.mnOreType = cube;
-            ARTHERPetSurvival.instance.GotOre(this.mnOreType);
-            this.SetNewState(eState.eSearchingForOre);
-            return true;
-        }
-        return false;
-    }
+                lnCutter++;
+                long num = mnX;
+                long num2 = mnY;
+                long num3 = mnZ;
+                if (lnCutter % 6 == 0)
+                {
+                    num--;
+                }
 
-    private void RotateExtractorTo(Vector3 direction)
-    {
-        byte b = 1;
-        if (direction.y > 0.5f)
-        {
-            b = 132;
-        }
-        else if (direction.y < -0.5f)
-        {
-            b = 4;
-        }
-        else
-        {
-            int num = 0;
-            if (direction.x < -0.5f)
-            {
-                num = 1;
-            }
-            else if (direction.z < -0.5f)
-            {
-                num = 2;
-            }
-            if (direction.x > 0.5f)
-            {
-                num = 3;
-            }
-            b = (byte)(1 | num << 6);
-        }
-        if (b != base.mFlags)
-        {
-            base.mFlags = b;
-            base.mSegment.SetFlagsNoChecking((int)(base.mnX % 16), (int)(base.mnY % 16), (int)(base.mnZ % 16), base.mFlags);
-            base.mSegment.RequestDelayedSave();
-            if (base.mWrapper != null && base.mWrapper.mbHasGameObject)
-            {
-                this.mTargetRotation = SegmentCustomRenderer.GetRotationQuaternion(b);
-                this.mbRotateModel = true;
-            }
-        }
-    }
+                if (lnCutter % 6 == 1)
+                {
+                    num++;
+                }
 
-    public void UpdateFetchExtractionPoint()
-    {
-        ushort num = 0;
-        if (base.mFrustrum != null)
-        {
-            Segment segment = base.mFrustrum.GetSegment(this.ExtractionX, this.ExtractionY, this.ExtractionZ);
-            if (segment == null)
-            {
-                SegmentManagerThread.instance.RequestSegmentForMachineFrustrum(base.mFrustrum, this.ExtractionX, this.ExtractionY, this.ExtractionZ);
-                return;
+                if (lnCutter % 6 == 2)
+                {
+                    num2--;
+                }
+
+                if (lnCutter % 6 == 3)
+                {
+                    num2++;
+                }
+
+                if (lnCutter % 6 == 4)
+                {
+                    num3--;
+                }
+
+                if (lnCutter % 6 == 5)
+                {
+                    num3++;
+                }
+
+                Segment segment = AttemptGetSegment(num, num2, num3);
+                if (segment != null && segment.IsSegmentInAGoodState())
+                {
+                    StorageMachineInterface storageMachineInterface = segment.SearchEntity(num, num2, num3) as StorageMachineInterface;
+                    if (storageMachineInterface != null)
+                    {
+                        eHopperPermissions permissions = storageMachineInterface.GetPermissions();
+                        if (permissions != 0 && permissions != eHopperPermissions.RemoveOnly)
+                        {
+                            return;
+                        }
+
+                        if (AttemptAutoUpgrade(OreExtractor.PLASMA_HEAD_ID, storageMachineInterface) ||
+                            (!AttemptAutoUpgrade(OreExtractor.ORGANIC_HEAD_ID, storageMachineInterface) &&
+                             (AttemptAutoUpgrade(OreExtractor.CRYSTAL_HEAD_ID, storageMachineInterface) || !AttemptAutoUpgrade(OreExtractor.STEEL_HEAD_ID, storageMachineInterface))))
+                        {
+                            ;
+                        }
+                    }
+                }
             }
-            if (!segment.mbInitialGenerationComplete)
-            {
-                return;
-            }
-            if (segment.mbDestroyed)
-            {
-                return;
-            }
-            num = segment.GetCube(this.ExtractionX, this.ExtractionY, this.ExtractionZ);
         }
-        else
+
+        public void UpdateState()
         {
-            num = WorldScript.instance.GetCube(this.ExtractionX, this.ExtractionY, this.ExtractionZ);
-            if (num == 0)
+            if (meState == eState.eOutOfStorage)
             {
-                return;
+                if (mnStoredOre + mnDrillRate + mnBonusOre < mnMaxOre)
+                    SetNewState(eState.eMining);
+                mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+            }
+            else if (meState == eState.eOutOfStorageVeinDepleted)
+            {
+                if (mnStoredOre + mnDrillRate + mnBonusOre < mnMaxOre)
+                    SetNewState(eState.eVeinDepleted);
+                else
+                    mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+            }
+
+            if (meState != eState.eDrillStuck)
+                mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+
+            if (meState == eState.eFetchingEntryPoint)
+                UpdateFetchEntryPoint();
+
+            if (meState == eState.eFetchingExtractionPoint)
+                UpdateFetchExtractionPoint();
+
+            if (meState == eState.eSearchingForOre)
+                DoVeinSearch();
+
+            if (meState == eState.eMining)
+            {
+                UpdateMining();
+                mrIssueTime = 0f;
+                mrWorkTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+            }
+            else mrIdleTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+
+            // Should handle this because a vanilla extractor could be on the same vein.
+            if (meState == eState.eVeinDepleted)
+            {
+                UpdateVeinDepleted();
+                mrIssueTime = 0.0f;
+            }
+
+            mrWorkEfficiency = mrWorkTime / (mrWorkTime + mrIdleTime);
+
+            if (meState == eState.eVeinDepleted)
+            {
+                UpdateVeinDepleted();
+                mrIssueTime = 0f;
+            }
+
+            if (meState == eState.eOutOfPower)
+            {
+                mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+                if (mrCurrentPower > mrPowerUsage)
+                    SetNewState(eState.eMining);
+            }
+
+            if (meState == eState.eOutOfPowerVeinDepleted)
+            {
+                mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+                if (mrCurrentPower > mrPowerUsage)
+                    SetNewState(eState.eVeinDepleted);
+            }
+
+            if (meState == eState.eIdle)
+            {
+                mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
+                if (mFrustrum != null)
+                    DropMachineFrustrum();
+            }
+
+            if (mbReportOffline && mrIssueTime > 0.0)
+            {
+                float num1 = 300f;
+                float num2 = mrIssueTime;
+                if (meState == eState.eOutOfStorage)
+                    num1 = 1800f;
+                if (meState == eState.eOutOfPowerVeinDepleted || meState == eState.eOutOfStorageVeinDepleted || (meState == eState.eVeinDepleted || meState == eState.eDrillStuck))
+                    num1 = 60f;
+                if (num2 < num1)
+                    num2 = -1f;
+                if (num2 > 0.0 && num2 > ARTHERPetSurvival.OreErrorTime)
+                {
+                    ARTHERPetSurvival.OreErrorTime = num2;
+                    ARTHERPetSurvival.OreErrorType = mnOreType;
+                    if (mnOreType == 0)
+                        ARTHERPetSurvival.OreErrorType = 1;
+                    ARTHERPetSurvival.ExtractorName = mName;
+                    if (meState == eState.eOutOfPower)
+                        ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfPower;
+                    if (meState == eState.eOutOfStorage)
+                        ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfStorage;
+                    if (meState == eState.eDrillStuck)
+                        ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eDrillStuck;
+                    if (mnOreType == 0)
+                        ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfOre;
+                    if (meState == eState.eIdle)
+                        ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfOre;
+                    if (meState == eState.eOutOfPowerVeinDepleted)
+                        ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfOre;
+                    if (meState == eState.eOutOfStorageVeinDepleted)
+                        ARTHERPetSurvival.ExtractorIssueType = ARTHERPetSurvival.eExtractorIssueType.eOutOfOre;
+                }
+
+                if (mrIssueTime <= 300.0)
+                    return;
+                ++GameManager.mnNumOreExtractors_With_Issues_Transitory;
             }
         }
-        if (num == this.mnOreType)
+
+        public void UpdateFetchEntryPoint()
         {
-            ARTHERPetSurvival.instance.GotOre(this.mnOreType);
-            if (this.mnStoredOre >= this.mnMaxOre)
+            EntryX = EntryY = EntryZ = 0L;
+            Vector3 directionVector = CubeHelper.GetDirectionVector((byte) (mFlags & 63U));
+            if (CheckNeighbourEntryCube(directionVector))
             {
-                this.SetNewState(eState.eOutOfStorage);
+                if (EntryX == 0L)
+                    return;
+                RotateExtractorTo(directionVector);
             }
             else
             {
-                this.SetNewState(eState.eMining);
-            }
-        }
-        else
-        {
-            this.SetNewState(eState.eSearchingForOre);
-        }
-    }
-
-    private void UpdateMining()
-    {
-        if (this.ExtractionX == 0)
-        {
-            this.SetNewState(eState.eSearchingForOre);
-        }
-        else if (!this.CheckHardness())
-        {
-            this.SetNewState(eState.eDrillStuck);
-        }
-        else
-        {
-            this.mrPowerUsage = 0.5f;
-            if (DifficultySettings.mbEasyPower)
-            {
-                this.mrPowerUsage *= 0.5f;
-            }
-            if (this.mnDrillTier == 0)
-            {
-                this.mrPowerUsage *= 0.25f;
-            }
-            this.mrPowerUsage += (float)(this.mnDrillRate - 1) / 2f;
-            float num = this.mrPowerUsage * LowFrequencyThread.mrPreviousUpdateTimeStep * DifficultySettings.mrResourcesFactor;
-            if (num <= this.mrCurrentPower)
-            {
-                this.mrCurrentPower -= num;
-                this.mrTimeUntilNextOre -= LowFrequencyThread.mrPreviousUpdateTimeStep * this.OreCollectionRate;
-                if (this.mrTimeUntilNextOre <= 0f)
+                Vector3 forward = SegmentCustomRenderer.GetRotationQuaternion(mFlags) * Vector3.forward;
+                forward.Normalize();
+                if (CheckNeighbourEntryCube(forward))
+                    return;
+                if (CheckNeighbourEntryCube(Vector3.forward))
                 {
-                    ushort num2 = 0;
-                    Segment segment = null;
-                    segment = ((base.mFrustrum == null) ? WorldScript.instance.GetSegment(this.ExtractionX, this.ExtractionY, this.ExtractionZ) : base.mFrustrum.GetSegment(this.ExtractionX, this.ExtractionY, this.ExtractionZ));
+                    if (EntryX == 0L)
+                        return;
+                    RotateExtractorTo(Vector3.forward);
+                }
+                else if (CheckNeighbourEntryCube(Vector3.back))
+                {
+                    if (EntryX == 0L)
+                        return;
+                    RotateExtractorTo(Vector3.back);
+                }
+                else if (CheckNeighbourEntryCube(Vector3.left))
+                {
+                    if (EntryX == 0L)
+                        return;
+                    RotateExtractorTo(Vector3.left);
+                }
+                else if (CheckNeighbourEntryCube(Vector3.right))
+                {
+                    if (EntryX == 0L)
+                        return;
+                    RotateExtractorTo(Vector3.right);
+                }
+                else if (CheckNeighbourEntryCube(Vector3.down))
+                {
+                    if (EntryX == 0L)
+                        return;
+                    RotateExtractorTo(Vector3.down);
+                }
+                else if (CheckNeighbourEntryCube(Vector3.up))
+                {
+                    if (EntryX == 0L)
+                        return;
+                    RotateExtractorTo(Vector3.up);
+                }
+                else
+                {
+                    EntryX = EntryY = EntryZ = 0L;
+                    ExtractionX = ExtractionY = ExtractionZ = 0L;
+                    SetNewState(eState.eIdle);
+                }
+            }
+        }
+
+        private bool CheckNeighbourEntryCube(Vector3 forward)
+        {
+            long num1 = mnX + (long) forward.x;
+            long num2 = mnY + (long) forward.y;
+            long num3 = mnZ + (long) forward.z;
+            ushort cube = WorldScript.instance.GetCube(num1, num2, num3);
+            if (cube == 0)
+            {
+                if (WorldScript.mbIsServer)
+                    SegmentManagerThread.instance.RequestSegmentForMachineFrustrum(mFrustrum, num1, num2, num3);
+                return true;
+            }
+
+            if (!CubeHelper.IsOre(cube))
+                return false;
+            EntryX = num1;
+            EntryY = num2;
+            EntryZ = num3;
+            mnOreType = cube;
+            ARTHERPetSurvival.instance.GotOre(mnOreType);
+            SetNewState(eState.eSearchingForOre);
+            return true;
+        }
+
+        private void RotateExtractorTo(Vector3 direction)
+        {
+            byte flags;
+            if (direction.y > 0.5)
+                flags = 132;
+            else if (direction.y < -0.5)
+            {
+                flags = 4;
+            }
+            else
+            {
+                int num = 0;
+                if (direction.x < -0.5)
+                    num = 1;
+                else if (direction.z < -0.5)
+                    num = 2;
+                if (direction.x > 0.5)
+                    num = 3;
+                flags = (byte) (1 | num << 6);
+            }
+
+            if (flags == mFlags)
+                return;
+            mFlags = flags;
+            mSegment.SetFlagsNoChecking((int) (mnX % 16L), (int) (mnY % 16L), (int) (mnZ % 16L), mFlags);
+            mSegment.RequestDelayedSave();
+            if (mWrapper == null || !mWrapper.mbHasGameObject)
+                return;
+            mTargetRotation = SegmentCustomRenderer.GetRotationQuaternion(flags);
+            mbRotateModel = true;
+        }
+
+
+        public void UpdateFetchExtractionPoint()
+        {
+            ushort cube;
+            if (mFrustrum != null)
+            {
+                Segment segment = mFrustrum.GetSegment(ExtractionX, ExtractionY, ExtractionZ);
+                if (segment == null)
+                {
+                    SegmentManagerThread.instance.RequestSegmentForMachineFrustrum(mFrustrum, ExtractionX, ExtractionY, ExtractionZ);
+                    return;
+                }
+
+                if (!segment.mbInitialGenerationComplete || segment.mbDestroyed)
+                    return;
+                cube = segment.GetCube(ExtractionX, ExtractionY, ExtractionZ);
+            }
+            else
+            {
+                cube = WorldScript.instance.GetCube(ExtractionX, ExtractionY, ExtractionZ);
+                if (cube == 0)
+                    return;
+            }
+
+            if (cube == mnOreType)
+            {
+                ARTHERPetSurvival.instance.GotOre(mnOreType);
+                if (mnStoredOre >= mnMaxOre)
+                    SetNewState(eState.eOutOfStorage);
+                else
+                    SetNewState(eState.eMining);
+            }
+            else
+                SetNewState(eState.eSearchingForOre);
+        }
+
+
+        private void UpdateMining()
+        {
+            if (ExtractionX == 0)
+                SetNewState(eState.eSearchingForOre);
+            else if (!CheckHardness())
+                SetNewState(eState.eDrillStuck);
+            else
+            {
+                mrPowerUsage = 0.5f;
+                if (DifficultySettings.mbEasyPower)
+                    mrPowerUsage *= 0.5f;
+                if (mnDrillTier == 0)
+                    mrPowerUsage *= 0.25f;
+                mrPowerUsage += (mnDrillRate - 1) / 2f;
+                float num = mrPowerUsage * LowFrequencyThread.mrPreviousUpdateTimeStep * DifficultySettings.mrResourcesFactor;
+                if (num <= mrCurrentPower)
+                {
+                    mrCurrentPower -= num;
+                    mrTimeUntilNextOre -= LowFrequencyThread.mrPreviousUpdateTimeStep * OreCollectionRate;
+                    if (mrTimeUntilNextOre > 0.0 || !WorldScript.mbIsServer)
+                        return;
+
+                    Segment segment = mFrustrum == null ? WorldScript.instance.GetSegment(ExtractionX, ExtractionY, ExtractionZ) : mFrustrum.GetSegment(ExtractionX, ExtractionY, ExtractionZ);
                     if (segment == null || !segment.mbInitialGenerationComplete || segment.mbDestroyed)
                     {
-                        this.mrTimeUntilNextOre = this.mrExtractionTime;
-                        this.SetNewState(eState.eFetchingExtractionPoint);
+                        mrTimeUntilNextOre = mrExtractionTime;
+                        SetNewState(eState.eFetchingExtractionPoint);
+                    }
+                    else if (segment.GetCube(ExtractionX, ExtractionY, ExtractionZ) != mnOreType)
+                    {
+                        mrTimeUntilNextOre = mrExtractionTime;
+                        SetNewState(eState.eFetchingEntryPoint);
                     }
                     else
                     {
-                        ushort cube = segment.GetCube(this.ExtractionX, this.ExtractionY, this.ExtractionZ);
-                        if (cube != this.mnOreType)
+                        ushort num2 = segment.GetCubeData(ExtractionX, ExtractionY, ExtractionZ).mValue;
+                        int num3 = (int) ((mnDepleteCount + mnBonusDeplete) / OreCollectionRate);
+                        if (num3 >= num2)
                         {
-                            this.mrTimeUntilNextOre = this.mrExtractionTime;
-                            this.SetNewState(eState.eFetchingEntryPoint);
+                            Debug.LogWarning("Ore Extractor doing final Mining extraction before moving to Clearing on next update, due to wanting to remove " + num3 +
+                                             " ore when there was only " + num2 + " ore left!");
+                            num3 = num2 - 1;
                         }
+
+                        if (num2 > 1)
+                        {
+                            ushort num4 = num2;
+                            if (num3 >= 2560)
+                                Debug.LogError("Error, risking overflow - deplete count is " + num3 + " and max ore is " + (ushort) 2560);
+                            if (num2 > 2560)
+                                num2 = 2560;
+                            ushort lData = (ushort) (num2 - (ushort) num3);
+                            mnEstimatedOreLeft = lData;
+                            if (lData > num4)
+                                Debug.LogError("Error! We just removed " + num3 + " ore, but now we have " + lData + " ore left!");
+
+                            // Simply don't change the cube value.
+                            //segment.SetCubeValueNoChecking((int) (ExtractionX % 16L), (int) (this.ExtractionY % 16L), (int) (this.ExtractionZ % 16L), lData);
+                            //segment.RequestDelayedSave();
+                            //if (TerrainData.GetSideTexture(mnOreType, lData) != TerrainData.GetSideTexture(mnOreType, num4))
+                            //  segment.RequestRegenerateGraphics();
+
+                            int num5 = (int) ((mnDrillRate + mnBonusOre) / OreCollectionRate);
+                            mnStoredOre += num5;
+                            GameManager.AddOre(num5, mnOreType);
+                            LowerCutterDurability(num5);
+                            RequestImmediateNetworkUpdate();
+                            MarkDirtyDelayed();
+                            mrTimeUntilNextOre = mrExtractionTime;
+                            if (mnStoredOre < mnMaxOre)
+                                return;
+                            SetNewState(eState.eOutOfStorage);
+                        }
+                        else if (EntryX != 0L)
+                            SetNewState(eState.eSearchingForOre);
                         else
-                        {
-                            CubeData cubeData = segment.GetCubeData(this.ExtractionX, this.ExtractionY, this.ExtractionZ);
-                            num2 = cubeData.mValue;
-                            int num3 = this.mnDepleteCount + this.mnBonusDeplete;
-                            num3 = (int)((float)num3 / this.OreCollectionRate);
-                            if (num3 >= num2)
-                            {
-                                Debug.LogWarning("Ore Extractor doing final Mining extraction before moving to Clearing on next update, due to wanting to remove " + num3 + " ore when there was only " + num2 + " ore left!");
-                                num3 = num2 - 1;
-                            }
-                            if (num2 > 1)
-                            {
-                                ushort num4 = num2;
-                                if (num3 >= 2560)
-                                {
-                                    Debug.LogError("Error, risking overflow - deplete count is " + num3 + " and max ore is " + (ushort)2560);
-                                }
-                                if (num2 > 2560)
-                                {
-                                    num2 = 2560;
-                                }
-                                num2 = (ushort)(this.mnEstimatedOreLeft = (ushort)(num2 - (ushort)num3));
-                                if (num2 > num4)
-                                {
-                                    Debug.LogError("Error! We just removed " + num3 + " ore, but now we have " + num2 + " ore left!");
-                                }
-                                segment.SetCubeValueNoChecking((int)(this.ExtractionX % 16), (int)(this.ExtractionY % 16), (int)(this.ExtractionZ % 16), num2);
-                                segment.RequestDelayedSave();
-                                if (TerrainData.GetSideTexture(this.mnOreType, num2) != TerrainData.GetSideTexture(this.mnOreType, num4))
-                                {
-                                    segment.RequestRegenerateGraphics();
-                                }
-                                int num5 = this.mnDrillRate + this.mnBonusOre;
-                                num5 = (int)((float)num5 / this.OreCollectionRate);
-                                this.mnStoredOre += num5;
-                                GameManager.AddOre(num5);
-                                this.LowerCutterDurability(num5);
-                                this.RequestImmediateNetworkUpdate();
-                                this.MarkDirtyDelayed();
-                                this.mrTimeUntilNextOre = this.mrExtractionTime;
-                                if (this.mnStoredOre >= this.mnMaxOre)
-                                {
-                                    this.SetNewState(eState.eOutOfStorage);
-                                }
-                            }
-                            else if (this.EntryX != 0)
-                            {
-                                this.SetNewState(eState.eSearchingForOre);
-                            }
-                            else
-                            {
-                                this.SetNewState(eState.eFetchingEntryPoint);
-                            }
-                        }
+                            SetNewState(eState.eFetchingEntryPoint);
+
+
                     }
                 }
-            }
-            else
-            {
-                this.SetNewState(eState.eOutOfPower);
+                else SetNewState(eState.eOutOfPower);
             }
         }
-    }
 
-    private void LowerCutterDurability(int lnOreCount)
-    {
-        if (this.mnCutterTier > 1)
-        {
-            this.mnCutterDurability -= lnOreCount;
-            if (this.mnCutterDurability <= 0)
-            {
-                this.mnCutterTier = 1;
-                this.mnCutterDurability = 10000;
-                this.CalculateEfficiency();
-            }
-        }
-    }
 
-    private void DoVeinSearch()
-    {
-        if (this.EntryX == 0)
+        private void LowerCutterDurability(int lnOreCount)
         {
-            this.SetNewState(eState.eFetchingEntryPoint);
-        }
-        else
-        {
-            this.ExtractionX = (this.ExtractionY = (this.ExtractionZ = 0L));
-            if (this.searchLocation == CubeCoord.Invalid)
-            {
-                this.queuedLocations = new Queue<CubeCoord>(100);
-                this.visitedLocations = new HashSet<CubeCoord>();
-                if (!this.SearchNeighbourLocation(this.EntryX, this.EntryY, this.EntryZ))
-                {
-                    return;
-                }
-            }
-            else if (!this.SearchNeighbours())
-            {
+            if (mnCutterTier <= 1)
                 return;
-            }
-            while (this.queuedLocations.Count > 0)
+
+            mnCutterDurability -= lnOreCount;
+            if (mnCutterDurability > 0)
+                return;
+            mnCutterTier = 1;
+            mnCutterDurability = 10000;
+            CalculateEfficiency();
+        }
+
+
+        private void DoVeinSearch()
+        {
+            if (EntryX == 0L)
             {
-                this.searchLocation = this.queuedLocations.Dequeue();
-                this.visitedLocations.Add(this.searchLocation);
-                if (!this.SearchNeighbours())
-                {
-                    return;
-                }
-            }
-            if (this.ExtractionX != 0)
-            {
-                if (this.mnStoredOre >= this.mnMaxOre)
-                {
-                    this.SetNewState(eState.eOutOfStorage);
-                }
-                else
-                {
-                    this.SetNewState(eState.eMining);
-                }
-                this.queuedLocations = null;
-                this.visitedLocations = null;
-                if (base.mFrustrum != null)
-                {
-                    Segment segment = base.mFrustrum.GetSegment(this.ExtractionX, this.ExtractionY, this.ExtractionZ);
-                    for (int i = 0; i < base.mFrustrum.mSegments.Count; i++)
-                    {
-                        Segment segment2 = base.mFrustrum.mSegments[i];
-                        if (segment2 != null && segment2 != base.mFrustrum.mMainSegment && segment2 != segment)
-                        {
-                            SegmentManagerThread.instance.RequestSegmentDropForMachineFrustrum(base.mFrustrum, segment2);
-                        }
-                    }
-                }
+                SetNewState(eState.eFetchingEntryPoint);
             }
             else
             {
-                this.queuedLocations = null;
-                if (this.mnStoredOre >= this.mnMaxOre)
+                ExtractionX = ExtractionY = ExtractionZ = 0L;
+                if (searchLocation == CubeCoord.Invalid)
                 {
-                    this.SetNewState(eState.eOutOfStorageVeinDepleted);
-                }
-                else
-                {
-                    this.SetNewState(eState.eVeinDepleted);
-                }
-            }
-            this.searchLocation = CubeCoord.Invalid;
-        }
-    }
-
-    private bool SearchNeighbours()
-    {
-        if (!this.SearchNeighbourLocation(this.searchLocation.x + 1, this.searchLocation.y, this.searchLocation.z))
-        {
-            return false;
-        }
-        if (this.ExtractionX != 0)
-        {
-            return true;
-        }
-        if (!this.SearchNeighbourLocation(this.searchLocation.x - 1, this.searchLocation.y, this.searchLocation.z))
-        {
-            return false;
-        }
-        if (this.ExtractionX != 0)
-        {
-            return true;
-        }
-        if (!this.SearchNeighbourLocation(this.searchLocation.x, this.searchLocation.y + 1, this.searchLocation.z))
-        {
-            return false;
-        }
-        if (this.ExtractionX != 0)
-        {
-            return true;
-        }
-        if (!this.SearchNeighbourLocation(this.searchLocation.x, this.searchLocation.y - 1, this.searchLocation.z))
-        {
-            return false;
-        }
-        if (this.ExtractionX != 0)
-        {
-            return true;
-        }
-        if (!this.SearchNeighbourLocation(this.searchLocation.x, this.searchLocation.y, this.searchLocation.z + 1))
-        {
-            return false;
-        }
-        if (this.ExtractionX != 0)
-        {
-            return true;
-        }
-        if (!this.SearchNeighbourLocation(this.searchLocation.x, this.searchLocation.y, this.searchLocation.z - 1))
-        {
-            return false;
-        }
-        return true;
-    }
-
-    private bool SearchNeighbourLocation(long x, long y, long z)
-    {
-        Segment segment = null;
-        if (base.mFrustrum != null)
-        {
-            segment = base.mFrustrum.GetSegment(x, y, z);
-            if (segment == null)
-            {
-                SegmentManagerThread.instance.RequestSegmentForMachineFrustrum(base.mFrustrum, x, y, z);
-                return false;
-            }
-            if (segment.mbInitialGenerationComplete && !segment.mbDestroyed)
-            {
-                goto IL_0084;
-            }
-            return false;
-        }
-        segment = WorldScript.instance.GetSegment(x, y, z);
-        if (segment != null && segment.mbInitialGenerationComplete && !segment.mbDestroyed)
-        {
-            goto IL_0084;
-        }
-        return false;
-        IL_0084:
-        ushort cube = segment.GetCube(x, y, z);
-        if (cube == this.mnOreType)
-        {
-            CubeCoord item = new CubeCoord(x, y, z);
-            if (this.visitedLocations == null)
-            {
-                Debug.LogError("Error! visitedLocations is null!");
-                return false;
-            }
-            if (this.queuedLocations == null)
-            {
-                Debug.LogError("Error! queuedLocations is null!");
-                return false;
-            }
-            if (!this.visitedLocations.Contains(item) && !this.queuedLocations.Contains(item))
-            {
-                CubeData cubeDataNoChecking = segment.GetCubeDataNoChecking((int)(x % 16), (int)(y % 16), (int)(z % 16));
-                ushort mValue = cubeDataNoChecking.mValue;
-                if (mValue > this.mnDepleteCount + this.mnBonusDeplete)
-                {
-                    this.ExtractionX = x;
-                    this.ExtractionY = y;
-                    this.ExtractionZ = z;
-                    this.queuedLocations.Clear();
-                }
-                else if (this.visitedLocations.Count < 16384)
-                {
-                    this.queuedLocations.Enqueue(item);
-                }
-            }
-        }
-        return true;
-    }
-
-    private void UpdateVeinDepleted()
-    {
-        float num = this.mrPowerUsage * LowFrequencyThread.mrPreviousUpdateTimeStep * DifficultySettings.mrResourcesFactor;
-        if (num <= this.mrCurrentPower)
-        {
-            this.mrCurrentPower -= num;
-            this.mrTimeUntilNextOre -= LowFrequencyThread.mrPreviousUpdateTimeStep * this.OreCollectionRate;
-            if (!this.CheckHardness())
-            {
-                this.queuedLocations = null;
-                this.visitedLocations = null;
-                this.SetNewState(eState.eDrillStuck);
-            }
-            else if (this.mrTimeUntilNextOre <= 0f)
-            {
-                if (this.visitedLocations == null)
-                {
-                    this.queuedLocations = null;
-                    this.visitedLocations = null;
-                    this.SetNewState(eState.eIdle);
-                    Debug.Log("Ore Extractor cleared vein, going to idle mode");
-                }
-                else
-                {
-                    bool flag = false;
-                    int num2 = -1;
-                    long num3 = 0L;
-                    long y = 0L;
-                    long z = 0L;
-                    Segment segment = null;
-                    while (this.visitedLocations.Count > 0 && !flag)
-                    {
-                        num2 = -1;
-                        num3 = 0L;
-                        y = 0L;
-                        z = 0L;
-                        foreach (CubeCoord visitedLocation in this.visitedLocations)
-                        {
-                            CubeCoord current = visitedLocation;
-                            long val = current.x - this.EntryX;
-                            long val2 = current.y - this.EntryY;
-                            long val3 = current.z - this.EntryZ;
-                            int num4 = (int)Util.Abs(val) + (int)Util.Abs(val2) + (int)Util.Abs(val3);
-                            if (num4 > num2)
-                            {
-                                num2 = num4;
-                                num3 = current.x;
-                                y = current.y;
-                                z = current.z;
-                            }
-                        }
-                        if (num3 == 0)
-                        {
-                            throw new AssertException("Ore Extractor: vein depleted visitedlocations broken");
-                        }
-                        segment = ((base.mFrustrum == null) ? WorldScript.instance.GetSegment(num3, y, z) : base.mFrustrum.GetSegment(num3, y, z));
-                        if (segment != null && segment.mbInitialGenerationComplete && !segment.mbDestroyed)
-                        {
-                            ushort cube = segment.GetCube(num3, y, z);
-                            if (cube != this.mnOreType)
-                            {
-                                this.visitedLocations.Remove(new CubeCoord(num3, y, z));
-                            }
-                            else
-                            {
-                                flag = true;
-                            }
-                            continue;
-                        }
-                        this.queuedLocations = null;
-                        this.visitedLocations = null;
-                        this.SetNewState(eState.eFetchingEntryPoint);
+                    queuedLocations = new Queue<CubeCoord>(100);
+                    visitedLocations = new HashSet<CubeCoord>();
+                    if (!SearchNeighbourLocation(EntryX, EntryY, EntryZ))
                         return;
-                    }
-                    if (flag)
+                }
+                else if (!SearchNeighbours())
+                    return;
+
+                while (queuedLocations.Count > 0)
+                {
+                    searchLocation = queuedLocations.Dequeue();
+                    visitedLocations.Add(searchLocation);
+                    if (!SearchNeighbours())
+                        return;
+                }
+
+                if (ExtractionX != 0L)
+                {
+                    if (mnStoredOre >= mnMaxOre)
+                        SetNewState(eState.eOutOfStorage);
+                    else
+                        SetNewState(eState.eMining);
+                    queuedLocations = null;
+                    visitedLocations = null;
+                    if (mFrustrum != null)
                     {
-                        CubeData cubeData = segment.GetCubeData(num3, y, z);
-                        ushort mValue = cubeData.mValue;
-                        int num5 = (int)Mathf.Ceil((float)(int)mValue * this.mrEfficiency);
-                        this.LowerCutterDurability(num5);
-                        this.mnStoredOre += num5;
-                        GameManager.AddOre(num5);
-                        WorldScript.instance.BuildFromEntity(segment, num3, y, z, 1, 0);
-                        this.MarkDirtyDelayed();
-                        this.mrTimeUntilNextOre = this.mrExtractionTime;
-                        if (this.mnStoredOre >= this.mnMaxOre)
+                        Segment segment = mFrustrum.GetSegment(ExtractionX, ExtractionY, ExtractionZ);
+                        for (int index = 0; index < mFrustrum.mSegments.Count; ++index)
                         {
-                            this.SetNewState(eState.eOutOfStorageVeinDepleted);
+                            Segment mSegment = mFrustrum.mSegments[index];
+                            if (mSegment != null && mSegment != mFrustrum.mMainSegment && mSegment != segment)
+                                SegmentManagerThread.instance.RequestSegmentDropForMachineFrustrum(mFrustrum, mSegment);
+                        }
+                    }
+                }
+                else
+                {
+                    queuedLocations = null;
+                    if (mnStoredOre >= mnMaxOre)
+                        SetNewState(eState.eOutOfStorageVeinDepleted);
+                    else
+                        SetNewState(eState.eVeinDepleted);
+                }
+
+                searchLocation = CubeCoord.Invalid;
+            }
+        }
+
+        private bool SearchNeighbours()
+        {
+            return SearchNeighbourLocation(searchLocation.x + 1L, searchLocation.y, searchLocation.z) && (ExtractionX != 0L ||
+                                                                                                                              SearchNeighbourLocation(searchLocation.x - 1L,
+                                                                                                                                  searchLocation.y, searchLocation.z) &&
+                                                                                                                              (ExtractionX != 0L ||
+                                                                                                                               SearchNeighbourLocation(searchLocation.x,
+                                                                                                                                   searchLocation.y + 1L, searchLocation.z) &&
+                                                                                                                               (ExtractionX != 0L ||
+                                                                                                                                SearchNeighbourLocation(searchLocation.x,
+                                                                                                                                    searchLocation.y - 1L, searchLocation.z) &&
+                                                                                                                                (ExtractionX != 0L ||
+                                                                                                                                 SearchNeighbourLocation(searchLocation.x,
+                                                                                                                                     searchLocation.y, searchLocation.z + 1L) &&
+                                                                                                                                 (ExtractionX != 0L ||
+                                                                                                                                  SearchNeighbourLocation(searchLocation.x,
+                                                                                                                                      searchLocation.y, searchLocation.z - 1L))))));
+        }
+
+
+
+        private bool SearchNeighbourLocation(long x, long y, long z)
+        {
+            Segment segment;
+            if (mFrustrum != null)
+            {
+                segment = mFrustrum.GetSegment(x, y, z);
+                if (segment == null)
+                {
+                    SegmentManagerThread.instance.RequestSegmentForMachineFrustrum(mFrustrum, x, y, z);
+                    return false;
+                }
+
+                if (!segment.mbInitialGenerationComplete || segment.mbDestroyed)
+                    return false;
+            }
+            else
+            {
+                segment = WorldScript.instance.GetSegment(x, y, z);
+                if (segment == null || !segment.mbInitialGenerationComplete || segment.mbDestroyed)
+                    return false;
+            }
+
+            if (segment.GetCube(x, y, z) == mnOreType)
+            {
+                CubeCoord cubeCoord = new CubeCoord(x, y, z);
+                if (visitedLocations == null)
+                {
+                    Debug.LogError("Error! visitedLocations is null!");
+                    return false;
+                }
+
+                if (queuedLocations == null)
+                {
+                    Debug.LogError("Error! queuedLocations is null!");
+                    return false;
+                }
+
+                if (!visitedLocations.Contains(cubeCoord) && !queuedLocations.Contains(cubeCoord))
+                {
+                    if (segment.GetCubeDataNoChecking((int) (x % 16L), (int) (y % 16L), (int) (z % 16L)).mValue > mnDepleteCount + mnBonusDeplete)
+                    {
+                        ExtractionX = x;
+                        ExtractionY = y;
+                        ExtractionZ = z;
+                        queuedLocations.Clear();
+                    }
+                    else if (visitedLocations.Count < 16384)
+                        queuedLocations.Enqueue(cubeCoord);
+                }
+            }
+
+            return true;
+        }
+
+
+
+        private void UpdateVeinDepleted()
+        {
+            float num1 = mrPowerUsage * LowFrequencyThread.mrPreviousUpdateTimeStep * DifficultySettings.mrResourcesFactor;
+            if (num1 <= (double) mrCurrentPower)
+            {
+                mrCurrentPower -= num1;
+                mrTimeUntilNextOre -= LowFrequencyThread.mrPreviousUpdateTimeStep * OreCollectionRate;
+                if (!CheckHardness())
+                {
+                    queuedLocations = null;
+                    visitedLocations = null;
+                    SetNewState(eState.eDrillStuck);
+                }
+                else
+                {
+                    if (mrTimeUntilNextOre > 0.0)
+                        return;
+                    if (visitedLocations == null)
+                    {
+                        queuedLocations = null;
+                        visitedLocations = null;
+                        SetNewState(eState.eIdle);
+                        Debug.Log("Ore Extractor cleared vein, going to idle mode");
+                    }
+                    else
+                    {
+                        bool flag = false;
+                        long x = 0;
+                        long y = 0;
+                        long z = 0;
+                        Segment segment = null;
+                        while (visitedLocations.Count > 0 && !flag)
+                        {
+                            int num2 = -1;
+                            x = 0L;
+                            y = 0L;
+                            z = 0L;
+                            foreach (CubeCoord visitedLocation in visitedLocations)
+                            {
+                                int num3 = (int) Util.Abs(visitedLocation.x - EntryX) + (int) Util.Abs(visitedLocation.y - EntryY) + (int) Util.Abs(visitedLocation.z - EntryZ);
+                                if (num3 > num2)
+                                {
+                                    num2 = num3;
+                                    x = visitedLocation.x;
+                                    y = visitedLocation.y;
+                                    z = visitedLocation.z;
+                                }
+                            }
+
+                            if (x == 0L)
+                                throw new AssertException("Ore Extractor: vein depleted visitedlocations broken");
+                            segment = mFrustrum == null ? WorldScript.instance.GetSegment(x, y, z) : mFrustrum.GetSegment(x, y, z);
+                            if (segment == null || !segment.mbInitialGenerationComplete || segment.mbDestroyed)
+                            {
+                                queuedLocations = null;
+                                visitedLocations = null;
+                                SetNewState(eState.eFetchingEntryPoint);
+                                return;
+                            }
+
+                            if (segment.GetCube(x, y, z) != mnOreType)
+                                visitedLocations.Remove(new CubeCoord(x, y, z));
+                            else
+                                flag = true;
+                        }
+
+                        if (flag)
+                        {
+                            int num2 = (int) Mathf.Ceil(segment.GetCubeData(x, y, z).mValue * mrEfficiency);
+                            LowerCutterDurability(num2);
+                            mnStoredOre += num2;
+                            GameManager.AddOre(num2, mnOreType);
+                            WorldScript.instance.BuildFromEntity(segment, x, y, z, 1, 0);
+                            MarkDirtyDelayed();
+                            mrTimeUntilNextOre = 0.0f;
+                            if (mnStoredOre >= mnMaxOre)
+                            {
+                                SetNewState(eState.eOutOfStorageVeinDepleted);
+                                return;
+                            }
+
+                            if (visitedLocations == null)
+                                Debug.LogError("visitedLocations is null!");
+                            else
+                                visitedLocations.Remove(new CubeCoord(x, y, z));
+                            if (mDistanceToPlayer < 128.0 && mDotWithPlayerForwards > 0.0)
+                                FloatingCombatTextManager.instance.QueueText(mnX, mnY + 1L, mnZ, 0.75f, PersistentSettings.GetString("OE_clearing"), Color.green, 1f, 64f);
+                        }
+
+                        if (visitedLocations.Count != 0)
                             return;
-                        }
-                        if (this.visitedLocations == null)
-                        {
-                            Debug.LogError("visitedLocations is null!");
-                        }
-                        else
-                        {
-                            this.visitedLocations.Remove(new CubeCoord(num3, y, z));
-                        }
-                        if (base.mDistanceToPlayer < 128f && base.mDotWithPlayerForwards > 0f)
-                        {
-                            FloatingCombatTextManager.instance.QueueText(base.mnX, base.mnY + 1, base.mnZ, 0.75f, "Clearing!", Color.green, 1f, 64f);
-                        }
-                    }
-                    if (this.visitedLocations.Count == 0)
-                    {
-                        this.queuedLocations = null;
-                        this.visitedLocations = null;
-                        this.SetNewState(eState.eIdle);
+                        queuedLocations = null;
+                        visitedLocations = null;
+                        SetNewState(eState.eIdle);
                         Debug.Log("Ore Extractor cleared vein, going to idle mode");
                     }
                 }
             }
-        }
-        else
-        {
-            this.queuedLocations = null;
-            this.SetNewState(eState.eOutOfPowerVeinDepleted);
-        }
-    }
-
-    private void CalculateEfficiency()
-    {
-        this.base_efficiency = 0.1f;
-        switch (this.mnCutterTier)
-        {
-            case 2:
-                this.base_efficiency = 0.2f;
-                break;
-            case 3:
-                this.base_efficiency = 0.3f;
-                break;
-            case 4:
-                this.base_efficiency = 0.5f;
-                break;
-            case 5:
-                this.base_efficiency = 4f;
-                break;
-        }
-        this.mrEfficiency = this.base_efficiency * (100f / TerrainData.GetHardness(this.mnOreType, 0));
-        if (this.mrEfficiency > 1f)
-        {
-            this.mrEfficiency = 1f;
-        }
-        this.CalcEfficiencyAndDepleteRate();
-    }
-
-    private bool CheckHardness()
-    {
-        int num = 150;
-        switch (this.mnCutterTier)
-        {
-            case 2:
-                num = 250;
-                break;
-            case 3:
-                num = 250;
-                break;
-            case 4:
-                num = 250;
-                break;
-            case 5:
-                num = 250;
-                break;
-        }
-        return TerrainData.GetHardness(this.mnOreType, 0) <= (float)num;
-    }
-
-    private void SetNewState(eState leNewState)
-    {
-        if (leNewState != this.meState)
-        {
-            if (leNewState == eState.eVeinDepleted && this.meState != eState.eOutOfStorageVeinDepleted && this.meState != eState.eOutOfPowerVeinDepleted)
+            else
             {
-                ARTHERPetSurvival.ClearingType = this.mnOreType;
+                queuedLocations = null;
+                SetNewState(eState.eOutOfPowerVeinDepleted);
+            }
+        }
+
+
+        private void CalculateEfficiency()
+        {
+            base_efficiency = 0.1f;
+            switch (mnCutterTier)
+            {
+                case 2:
+                    base_efficiency = 0.2f;
+                    break;
+                case 3:
+                    base_efficiency = 0.3f;
+                    break;
+                case 4:
+                    base_efficiency = 0.5f;
+                    break;
+                case 5:
+                    base_efficiency = 4f;
+                    break;
+            }
+
+            mrEfficiency = base_efficiency * (100f / TerrainData.GetHardness(mnOreType, 0));
+            if (mrEfficiency > 1.0)
+                mrEfficiency = 1f;
+            CalcEfficiencyAndDepleteRate();
+        }
+
+        private bool CheckHardness()
+        {
+            return TerrainData.GetHardness(mnOreType, 0) <= (mTierUpgrade == 1 ? 450 : 250);
+        }
+
+        private void SetNewState(eState leNewState)
+        {
+            if (leNewState == meState)
+                return;
+            if (leNewState == eState.eVeinDepleted && meState != eState.eOutOfStorageVeinDepleted && meState != eState.eOutOfPowerVeinDepleted)
+            {
+                ARTHERPetSurvival.ClearingType = mnOreType;
                 ARTHERPetSurvival.ExtractorEnteringClearing = true;
-                ARTHERPetSurvival.ExtractorName = this.mName;
+                ARTHERPetSurvival.ExtractorName = mName;
             }
-            this.RequestImmediateNetworkUpdate();
-            this.meState = leNewState;
-        }
-    }
 
-    public override void DropGameObject()
-    {
-        base.DropGameObject();
-        this.mbLinkedToGO = false;
-        if ((Object)this.TutorialEffect != (Object)null)
-        {
-            Object.Destroy(this.TutorialEffect);
-            this.TutorialEffect = null;
+            RequestImmediateNetworkUpdate();
+            meState = leNewState;
         }
-        if ((Object)this.FullStorageTutorial != (Object)null)
-        {
-            Object.Destroy(this.FullStorageTutorial);
-            this.FullStorageTutorial = null;
-        }
-        if ((Object)this.LowPowerTutorial != (Object)null)
-        {
-            Object.Destroy(this.LowPowerTutorial);
-            this.LowPowerTutorial = null;
-        }
-    }
 
-    public override void UnitySuspended()
-    {
-        this.WorkLight = null;
-        this.MiningSparks = null;
-        this.DrillChunks = null;
-        this.mRotCont = null;
-        this.DebugReadout = null;
-        this.DrillHeadObject = null;
-        this.OreExtractorBarThing = null;
-        if ((Object)this.TutorialEffect != (Object)null)
-        {
-            Object.Destroy(this.TutorialEffect);
-            this.TutorialEffect = null;
-        }
-        if ((Object)this.FullStorageTutorial != (Object)null)
-        {
-            Object.Destroy(this.FullStorageTutorial);
-            this.FullStorageTutorial = null;
-        }
-        if ((Object)this.LowPowerTutorial != (Object)null)
-        {
-            Object.Destroy(this.LowPowerTutorial);
-            this.LowPowerTutorial = null;
-        }
-    }
 
-    private void LinkToGO()
-    {
-        if (base.mWrapper != null && base.mWrapper.mbHasGameObject)
+        public override void DropGameObject()
         {
-            if (base.mWrapper.mGameObjectList == null)
+            base.DropGameObject();
+            mbLinkedToGO = false;
+            if (TutorialEffect != null)
             {
-                Debug.LogError("Ore Extractor missing game object #0?");
+                Object.Destroy(TutorialEffect);
+                TutorialEffect = null;
             }
-            if ((Object)base.mWrapper.mGameObjectList[0].gameObject == (Object)null)
-            {
-                Debug.LogError("Ore Extractor missing game object #0 (GO)?");
-            }
-            this.WorkLight = base.mWrapper.mGameObjectList[0].gameObject.GetComponentInChildren<Light>();
-            if ((Object)this.WorkLight == (Object)null)
-            {
-                Debug.LogError("Ore extractor has missing light?");
-            }
-            this.WorkLight.enabled = false;
-            this.MiningSparks = base.mWrapper.mGameObjectList[0].gameObject.transform.Search("MiningSparks").gameObject;
-            this.DrillChunks = base.mWrapper.mGameObjectList[0].gameObject.transform.Search("DrillParticles").gameObject;
-            this.OreExtractorModel = base.mWrapper.mGameObjectList[0].gameObject.transform.Search("Ore Extractor").gameObject;
-            if ((Object)this.MiningSparks == (Object)null)
-            {
-                Debug.LogError("Failed to find MiningSparks!");
-            }
-            this.DrillChunks.SetActive(false);
-            this.MiningSparks.SetActive(false);
-            this.mRotCont = base.mWrapper.mGameObjectList[0].gameObject.GetComponentInChildren<RotateConstantlyScript>();
-            if ((Object)this.mRotCont == (Object)null)
-            {
-                Debug.LogError("Ore Extractor has missing rotator?");
-            }
-            this.DrillHeadObject = base.mWrapper.mGameObjectList[0].gameObject.transform.Search("Ore Extractor Drills").gameObject;
-            if ((Object)this.DrillHeadObject == (Object)null)
-            {
-                Debug.LogError("Ore Extractor Drills missing!");
-            }
-            this.OreExtractorBarThing = base.mWrapper.mGameObjectList[0].gameObject.transform.Search("Ore Extractor Bar Thing").gameObject.GetComponent<Renderer>();
-            if ((Object)this.OreExtractorBarThing == (Object)null)
-            {
-                Debug.LogError("OreExtractorBarThing missing!");
-            }
-            this.mPowerMPB = new MaterialPropertyBlock();
-            this.mbLinkedToGO = true;
-            this.DebugReadout = base.mWrapper.mGameObjectList[0].gameObject.GetComponentInChildren<TextMesh>();
-            this.DebugReadout.text = "Intialising...";
-            this.mrTimeUntilFlash = (float)Random.Range(0, 100) / 100f;
-            this.mnVisualCutterTier = -1;
-            MeshRenderer component = this.OreExtractorModel.GetComponent<MeshRenderer>();
-            component.material.SetColor("_Color", this.mCubeColor);
-        }
-    }
 
-    private void UpdateTutorial()
-    {
-        if (WorldScript.meGameMode == eGameMode.eSurvival)
+            if (FullStorageTutorial != null)
+            {
+                Object.Destroy(FullStorageTutorial);
+                FullStorageTutorial = null;
+            }
+
+            if (!(LowPowerTutorial != null))
+                return;
+            Object.Destroy(LowPowerTutorial);
+            LowPowerTutorial = null;
+        }
+
+
+        public override void UnitySuspended()
         {
+            WorkLight = null;
+            MiningSparks = null;
+            DrillChunks = null;
+            mRotCont = null;
+            DebugReadout = null;
+            DrillHeadObject = null;
+            OreExtractorBarThing = null;
+            if (TutorialEffect != null)
+            {
+                Object.Destroy(TutorialEffect);
+                TutorialEffect = null;
+            }
+
+            if (FullStorageTutorial != null)
+            {
+                Object.Destroy(FullStorageTutorial);
+                FullStorageTutorial = null;
+            }
+
+            if (!(LowPowerTutorial != null))
+                return;
+            Object.Destroy(LowPowerTutorial);
+            LowPowerTutorial = null;
+        }
+
+        private void LinkToGO()
+        {
+            if (mWrapper != null && mWrapper.mbHasGameObject)
+            {
+                if (mWrapper.mGameObjectList == null)
+                    Debug.LogError("Ore Extractor missing game object #0?");
+                if (mWrapper.mGameObjectList[0].gameObject == null)
+                    Debug.LogError("Ore Extractor missing game object #0 (GO)?");
+                WorkLight = mWrapper.mGameObjectList[0].gameObject.GetComponentInChildren<Light>();
+                if (WorkLight == null)
+                    Debug.LogError("Ore extractor has missing light?");
+                WorkLight.enabled = false;
+                MiningSparks = mWrapper.mGameObjectList[0].gameObject.transform.Search("MiningSparks").gameObject;
+                DrillChunks = mWrapper.mGameObjectList[0].gameObject.transform.Search("DrillParticles").gameObject;
+                OreExtractorModel = mWrapper.mGameObjectList[0].gameObject.transform.Search("Ore Extractor").gameObject;
+                if (MiningSparks == null)
+                    Debug.LogError("Failed to find MiningSparks!");
+                DrillChunks.SetActive(false);
+                MiningSparks.SetActive(false);
+                mRotCont = mWrapper.mGameObjectList[0].gameObject.GetComponentInChildren<RotateConstantlyScript>();
+                if (mRotCont == null)
+                    Debug.LogError("Ore Extractor has missing rotator?");
+                DrillHeadObject = mWrapper.mGameObjectList[0].gameObject.transform.Search("Ore Extractor Drills").gameObject;
+                if (DrillHeadObject == null)
+                    Debug.LogError("Ore Extractor Drills missing!");
+                OreExtractorBarThing = mWrapper.mGameObjectList[0].gameObject.transform.Search("Ore Extractor Bar Thing").gameObject.GetComponent<Renderer>();
+                if (OreExtractorBarThing == null)
+                    Debug.LogError("OreExtractorBarThing missing!");
+                mPowerMPB = new MaterialPropertyBlock();
+                mbLinkedToGO = true;
+                DebugReadout = mWrapper.mGameObjectList[0].gameObject.GetComponentInChildren<TextMesh>();
+                DebugReadout.text = "Intialising...";
+                mrTimeUntilFlash = Random.Range(0, 100) / 100f;
+                mnVisualCutterTier = -1;
+
+                // Customization of visual done here.
+                MeshRenderer component = OreExtractorModel.GetComponent<MeshRenderer>();
+                component.material.SetColor("_Color", mCubeColor);
+            }
+        }
+
+        private void UpdateTutorial()
+        {
+            if (WorldScript.meGameMode != eGameMode.eSurvival)
+                return;
             if (SurvivalPlayerScript.meTutorialState == SurvivalPlayerScript.eTutorialState.NowFuckOff)
             {
-                if (this.meState == eState.eOutOfPower)
+                if (meState == eState.eOutOfPower)
                 {
-                    if ((Object)this.LowPowerTutorial == (Object)null && MobSpawnManager.mrPreviousBaseThreat < 1f)
+                    if (LowPowerTutorial == null && MobSpawnManager.mrPreviousBaseThreat < 1.0)
                     {
-                        this.LowPowerTutorial = Object.Instantiate(SurvivalSpawns.instance.OE_NoPower, base.mWrapper.mGameObjectList[0].gameObject.transform.position + Vector3.up + Vector3.up, Quaternion.identity);
-                        this.LowPowerTutorial.SetActive(true);
-                        this.LowPowerTutorial.transform.parent = base.mWrapper.mGameObjectList[0].gameObject.transform;
+                        LowPowerTutorial = Object.Instantiate<GameObject>(SurvivalSpawns.instance.OE_NoPower,
+                            mWrapper.mGameObjectList[0].gameObject.transform.position + Vector3.up + Vector3.up, Quaternion.identity);
+                        LowPowerTutorial.SetActive(true);
+                        LowPowerTutorial.transform.parent = mWrapper.mGameObjectList[0].gameObject.transform;
                     }
                 }
-                else if ((Object)this.LowPowerTutorial != (Object)null)
+                else if (LowPowerTutorial != null)
                 {
-                    Object.Destroy(this.LowPowerTutorial);
-                    this.LowPowerTutorial = null;
+                    Object.Destroy(LowPowerTutorial);
+                    LowPowerTutorial = null;
                 }
-                if (this.meState == eState.eOutOfStorage && MobSpawnManager.mrPreviousBaseThreat < 1f)
+
+                if (meState == eState.eOutOfStorage && MobSpawnManager.mrPreviousBaseThreat < 1.0)
                 {
-                    if ((Object)this.FullStorageTutorial == (Object)null)
+                    if (FullStorageTutorial == null)
                     {
-                        this.FullStorageTutorial = Object.Instantiate(SurvivalSpawns.instance.OE_NoStorage, base.mWrapper.mGameObjectList[0].gameObject.transform.position + Vector3.up + Vector3.up, Quaternion.identity);
-                        this.FullStorageTutorial.SetActive(true);
-                        this.FullStorageTutorial.transform.parent = base.mWrapper.mGameObjectList[0].gameObject.transform;
+                        FullStorageTutorial = Object.Instantiate<GameObject>(SurvivalSpawns.instance.OE_NoStorage,
+                            mWrapper.mGameObjectList[0].gameObject.transform.position + Vector3.up + Vector3.up, Quaternion.identity);
+                        FullStorageTutorial.SetActive(true);
+                        FullStorageTutorial.transform.parent = mWrapper.mGameObjectList[0].gameObject.transform;
                     }
                 }
-                else if ((Object)this.FullStorageTutorial != (Object)null)
+                else if (FullStorageTutorial != null)
                 {
-                    Object.Destroy(this.FullStorageTutorial);
-                    this.FullStorageTutorial = null;
+                    Object.Destroy(FullStorageTutorial);
+                    FullStorageTutorial = null;
                 }
             }
+
             if (SurvivalPlayerScript.meTutorialState == SurvivalPlayerScript.eTutorialState.PutPowerIntoExtractor)
             {
-                if ((Object)this.TutorialEffect == (Object)null)
+                if (TutorialEffect == null)
                 {
-                    this.TutorialEffect = Object.Instantiate(SurvivalSpawns.instance.PowerOE, base.mWrapper.mGameObjectList[0].gameObject.transform.position + Vector3.up + Vector3.up, Quaternion.identity);
-                    this.TutorialEffect.SetActive(true);
-                    this.TutorialEffect.transform.parent = base.mWrapper.mGameObjectList[0].gameObject.transform;
+                    TutorialEffect = Object.Instantiate<GameObject>(SurvivalSpawns.instance.PowerOE,
+                        mWrapper.mGameObjectList[0].gameObject.transform.position + Vector3.up + Vector3.up, Quaternion.identity);
+                    TutorialEffect.SetActive(true);
+                    TutorialEffect.transform.parent = mWrapper.mGameObjectList[0].gameObject.transform;
                 }
             }
-            else if ((Object)this.TutorialEffect != (Object)null)
+            else if (TutorialEffect != null)
             {
-                Object.Destroy(this.TutorialEffect);
-                this.TutorialEffect = null;
+                Object.Destroy(TutorialEffect);
+                TutorialEffect = null;
             }
-            if (SurvivalPlayerScript.meTutorialState == SurvivalPlayerScript.eTutorialState.RemoveCoalFromHopper && this.mnStoredOre == 0)
-            {
-                this.mrTimeUntilNextOre *= 0.5f;
-            }
-        }
-    }
 
-    public override void UnityUpdate()
-    {
-        this.mrTimeElapsed += Time.deltaTime;
-        if (!this.mbLinkedToGO)
-        {
-            this.LinkToGO();
+            if (SurvivalPlayerScript.meTutorialState != SurvivalPlayerScript.eTutorialState.RemoveCoalFromHopper || mnStoredOre != 0)
+                return;
+            mrTimeUntilNextOre *= 0.5f;
         }
-        else
-        {
-            this.UpdateTutorial();
-            if (this.mnVisualCutterTier != this.mnCutterTier)
-            {
-                this.mnVisualCutterTier = this.mnCutterTier;
-                this.DrillHeadObject.transform.Search("Drillhead Default").gameObject.SetActive(false);
-                this.DrillHeadObject.transform.Search("Drillhead Steel").gameObject.SetActive(false);
-                this.DrillHeadObject.transform.Search("Drillhead Crystal").gameObject.SetActive(false);
-                this.DrillHeadObject.transform.Search("Drillhead Organic").gameObject.SetActive(false);
-                this.DrillHeadObject.transform.Search("Drillhead Plasma").gameObject.SetActive(false);
-                if (this.mnVisualCutterTier == 1)
-                {
-                    this.DrillHeadObject.transform.Search("Drillhead Default").gameObject.SetActive(true);
-                }
-                if (this.mnVisualCutterTier == 2)
-                {
-                    this.DrillHeadObject.transform.Search("Drillhead Steel").gameObject.SetActive(true);
-                }
-                if (this.mnVisualCutterTier == 3)
-                {
-                    this.DrillHeadObject.transform.Search("Drillhead Crystal").gameObject.SetActive(true);
-                }
-                if (this.mnVisualCutterTier == 4)
-                {
-                    this.DrillHeadObject.transform.Search("Drillhead Organic").gameObject.SetActive(true);
-                }
-                if (this.mnVisualCutterTier == 5)
-                {
-                    this.DrillHeadObject.transform.Search("Drillhead Plasma").gameObject.SetActive(true);
-                }
-            }
-            if (base.mDistanceToPlayer < 16f)
-            {
-                this.DrillHeadObject.SetActive(true);
-                this.mRotCont.ZRot = base.mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch * (float)this.mnDrillRate * 0.125f;
-            }
-            else
-            {
-                this.DrillHeadObject.SetActive(false);
-                this.mRotCont.ZRot = 0f;
-            }
-            if (this.mbRotateModel)
-            {
-                base.mWrapper.mGameObjectList[0].transform.rotation = this.mTargetRotation;
-                this.mbRotateModel = false;
-            }
-            if (this.meState == eState.eMining)
-            {
-                if (base.mDistanceToPlayer < 32f)
-                {
-                    if (this.mrTargetPitch == 0f)
-                    {
-                        this.mrTargetPitch = Random.Range(0.95f, 1.05f);
-                    }
-                    if (base.mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch < this.mrTargetPitch)
-                    {
-                        base.mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch += Time.deltaTime * 0.1f;
-                    }
-                }
-            }
-            else
-            {
-                base.mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch *= 0.99f;
-            }
-            bool flag = true;
-            if (base.mDistanceToPlayer > 128f)
-            {
-                flag = false;
-            }
-            if (base.mSegment.mbOutOfView)
-            {
-                flag = false;
-            }
-            if (base.mbWellBehindPlayer)
-            {
-                flag = false;
-            }
-            if (flag != ((Component)this.DebugReadout).GetComponent<Renderer>().enabled)
-            {
-                ((Component)this.DebugReadout).GetComponent<Renderer>().enabled = flag;
-            }
-            if (flag != this.OreExtractorModel.GetComponent<Renderer>().enabled)
-            {
-                this.OreExtractorModel.GetComponent<Renderer>().enabled = flag;
-            }
-            if (flag)
-            {
-                this.UpdateTextMesh();
-                this.mPowerMPB.SetFloat("_GlowMult", this.mrNormalisedPower * this.mrNormalisedPower * 16f);
-                this.OreExtractorBarThing.SetPropertyBlock(this.mPowerMPB);
-            }
-            this.mnUpdates++;
-            this.UpdateWorkLight();
-        }
-    }
 
-    private void UpdateTextMesh()
-    {
-        if (base.mDistanceToPlayer < 64f)
+        public override void UnityUpdate()
         {
-            string text = this.DebugReadout.text;
-            if (this.meState == eState.eOutOfStorage)
+            try
             {
-                text = PersistentSettings.GetString("Out_Of_Storage");
+                mrTimeElapsed += Time.deltaTime;
+                if (!mbLinkedToGO)
+                {
+                    LinkToGO();
+                }
+                else
+                {
+                    UpdateTutorial();
+                    if (mnVisualCutterTier != mnCutterTier)
+                    {
+                        mnVisualCutterTier = mnCutterTier;
+                        DrillHeadObject.transform.Search("Drillhead Default").gameObject.SetActive(false);
+                        DrillHeadObject.transform.Search("Drillhead Steel").gameObject.SetActive(false);
+                        DrillHeadObject.transform.Search("Drillhead Crystal").gameObject.SetActive(false);
+                        DrillHeadObject.transform.Search("Drillhead Organic").gameObject.SetActive(false);
+                        DrillHeadObject.transform.Search("Drillhead Plasma").gameObject.SetActive(false);
+                        if (mnVisualCutterTier == 1)
+                            DrillHeadObject.transform.Search("Drillhead Default").gameObject.SetActive(true);
+                        if (mnVisualCutterTier == 2)
+                            DrillHeadObject.transform.Search("Drillhead Steel").gameObject.SetActive(true);
+                        if (mnVisualCutterTier == 3)
+                            DrillHeadObject.transform.Search("Drillhead Crystal").gameObject.SetActive(true);
+                        if (mnVisualCutterTier == 4)
+                            DrillHeadObject.transform.Search("Drillhead Organic").gameObject.SetActive(true);
+                        if (mnVisualCutterTier == 5)
+                            DrillHeadObject.transform.Search("Drillhead Plasma").gameObject.SetActive(true);
+                    }
+
+                    if (mDistanceToPlayer < 16.0)
+                    {
+                        DrillHeadObject.SetActive(true);
+                        mRotCont.ZRot = (float) (mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch * (double) mnDrillRate * 0.125);
+                    }
+                    else
+                    {
+                        DrillHeadObject.SetActive(false);
+                        mRotCont.ZRot = 0.0f;
+                    }
+
+                    if (mbRotateModel)
+                    {
+                        mWrapper.mGameObjectList[0].transform.rotation = mTargetRotation;
+                        mbRotateModel = false;
+                    }
+
+                    if (meState == eState.eMining)
+                    {
+                        if (mDistanceToPlayer < 32.0)
+                        {
+                            if (mrTargetPitch == 0.0)
+                                mrTargetPitch = Random.Range(0.95f, 1.05f);
+                            if (mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch < (double) mrTargetPitch)
+                                mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch += Time.deltaTime * 0.1f;
+                        }
+                    }
+                    else
+                        mWrapper.mGameObjectList[0].gameObject.GetComponent<AudioSource>().pitch *= 0.99f;
+
+                    bool flag = true;
+                    if (mDistanceToPlayer > 128.0)
+                        flag = false;
+                    if (mSegment.mbOutOfView)
+                        flag = false;
+                    if (mbWellBehindPlayer)
+                        flag = false;
+                    if (flag != DebugReadout.GetComponent<Renderer>().enabled)
+                        DebugReadout.GetComponent<Renderer>().enabled = flag;
+                    if (flag != OreExtractorModel.GetComponent<Renderer>().enabled)
+                        OreExtractorModel.GetComponent<Renderer>().enabled = flag;
+                    if (flag)
+                    {
+                        UpdateTextMesh();
+                        mPowerMPB.SetFloat("_GlowMult", (float) (mrNormalisedPower * (double) mrNormalisedPower * 16.0));
+                        OreExtractorBarThing.SetPropertyBlock(mPowerMPB);
+                    }
+
+                    ++mnUpdates;
+                    UpdateWorkLight();
+                }
             }
-            else if (this.meState == eState.eOutOfPower)
+            catch (Exception e)
             {
-                text = PersistentSettings.GetString("Out_Of_Power");
+                Logging.LogException(e);
             }
-            else if (this.meState == eState.eSearchingForOre)
-            {
-                text = PersistentSettings.GetString("OE_Searching");
-            }
-            else if (this.meState == eState.eDrillStuck)
-            {
-                text = ((this.mnUpdates % 240 != 0) ? PersistentSettings.GetString("Upgrade_Drill_Head") : PersistentSettings.GetString("Drill_Stuck"));
-            }
-            else if (this.meState == eState.eMining)
-            {
-                text = PersistentSettings.GetString("Next_Ore") + this.mrTimeUntilNextOre.ToString("F0") + "s";
-            }
-            else if (this.meState == eState.eVeinDepleted)
+        }
+
+
+        private void UpdateTextMesh()
+        {
+            if (mDistanceToPlayer >= 64.0)
+                return;
+            string str = DebugReadout.text;
+            if (meState == eState.eOutOfStorage)
+                str = PersistentSettings.GetString("Out_Of_Storage");
+            else if (meState == eState.eOutOfPower)
+                str = PersistentSettings.GetString("Out_Of_Power");
+            else if (meState == eState.eSearchingForOre)
+                str = PersistentSettings.GetString("OE_Searching");
+            else if (meState == eState.eDrillStuck)
+                str = mnUpdates % 240 != 0 ? PersistentSettings.GetString("Upgrade_Drill_Head") : PersistentSettings.GetString("Drill_Stuck");
+            else if (meState == eState.eMining)
+                str = PersistentSettings.GetString("Next_Ore") + mrTimeUntilNextOre.ToString("F0") + "s";
+            else if (meState == eState.eVeinDepleted)
             {
                 int num = 0;
-                if (this.visitedLocations != null)
-                {
-                    num = this.visitedLocations.Count;
-                }
+                if (visitedLocations != null)
+                    num = visitedLocations.Count;
                 if (num > 0)
-                {
-                    text = PersistentSettings.GetString("Clearing_Vein") + num;
-                }
+                    str = PersistentSettings.GetString("Clearing_Vein") + num;
             }
-            else if (this.meState == eState.eIdle)
+            else if (meState == eState.eIdle)
             {
-                if (this.mnUpdates % 240 < 120)
+                if (mnUpdates % 240 < 120)
                 {
-                    text = PersistentSettings.GetString("OE_Searching");
-                    this.DebugReadout.color = Color.white;
+                    str = PersistentSettings.GetString("OE_Searching");
+                    DebugReadout.color = Color.white;
                 }
                 else
                 {
-                    text = PersistentSettings.GetString("Cant_Find_Ore");
-                    this.DebugReadout.color = Color.red;
+                    str = PersistentSettings.GetString("Cant_Find_Ore");
+                    DebugReadout.color = Color.red;
                 }
             }
-            if (!text.Equals(this.DebugReadout.text))
-            {
-                this.DebugReadout.text = text;
-            }
-        }
-    }
 
-    private void UpdateWorkLight()
-    {
-        if (base.mDotWithPlayerForwards < -10f)
-        {
-            this.WorkLight.enabled = false;
+            if (str.Equals(DebugReadout.text))
+                return;
+            DebugReadout.text = str;
         }
-        else if (base.mVectorToPlayer.y > 16f || base.mVectorToPlayer.y < -16f)
+
+
+        private void UpdateWorkLight()
         {
-            this.WorkLight.enabled = false;
-        }
-        else if (base.mDistanceToPlayer > 64f)
-        {
-            this.WorkLight.enabled = false;
-        }
-        else
-        {
-            if (this.meState == eState.eIdle)
+            if (mDotWithPlayerForwards < -10.0)
+                WorkLight.enabled = false;
+            else if (mVectorToPlayer.y > 16.0 || mVectorToPlayer.y < -16.0)
+                WorkLight.enabled = false;
+            else if (mDistanceToPlayer > 64.0)
             {
-                this.WorkLight.color = new Color(1f, 0.75f, 0.1f, 1f);
-                float intensity = Mathf.Sin((float)this.mnUpdates / 60f) + 1f;
-                this.WorkLight.intensity = intensity;
-                this.WorkLight.range = 2f;
+                WorkLight.enabled = false;
             }
-            if (this.meState == eState.eFetchingEntryPoint || this.meState == eState.eFetchingExtractionPoint)
+            else
             {
-                this.WorkLight.color = Color.blue;
-                this.WorkLight.enabled = true;
-                this.WorkLight.range = 5f;
-            }
-            if (this.meState == eState.eSearchingForOre)
-            {
-                this.WorkLight.color = Color.yellow;
-            }
-            if (this.meState == eState.eMining || this.meState == eState.eVeinDepleted)
-            {
-                if (base.mDotWithPlayerForwards < 0f)
+                if (meState == eState.eIdle)
                 {
-                    this.MiningSparks.SetActive(false);
-                    this.DrillChunks.SetActive(false);
+                    WorkLight.color = new Color(1f, 0.75f, 0.1f, 1f);
+                    WorkLight.intensity = Mathf.Sin(mnUpdates / 60f) + 1f;
+                    WorkLight.range = 2f;
+                }
+
+                if (meState == eState.eFetchingEntryPoint || meState == eState.eFetchingExtractionPoint)
+                {
+                    WorkLight.color = Color.blue;
+                    WorkLight.enabled = true;
+                    WorkLight.range = 5f;
+                }
+
+                if (meState == eState.eSearchingForOre)
+                    WorkLight.color = Color.yellow;
+                if (meState == eState.eMining || meState == eState.eVeinDepleted)
+                {
+                    if (mDotWithPlayerForwards < 0.0)
+                    {
+                        MiningSparks.SetActive(false);
+                        DrillChunks.SetActive(false);
+                    }
+                    else
+                    {
+                        if (mDistanceToPlayer < 32.0)
+                            MiningSparks.SetActive(true);
+                        else
+                            MiningSparks.SetActive(false);
+                        if (mDistanceToPlayer < 8.0)
+                            DrillChunks.SetActive(true);
+                        else
+                            DrillChunks.SetActive(false);
+                    }
+
+                    WorkLight.color = new Color(1f, 0.55f, 0.1f, 1f);
                 }
                 else
                 {
-                    if (base.mDistanceToPlayer < 32f)
-                    {
-                        this.MiningSparks.SetActive(true);
-                    }
-                    else
-                    {
-                        this.MiningSparks.SetActive(false);
-                    }
-                    if (base.mDistanceToPlayer < 8f)
-                    {
-                        this.DrillChunks.SetActive(true);
-                    }
-                    else
-                    {
-                        this.DrillChunks.SetActive(false);
-                    }
+                    DrillChunks.SetActive(false);
+                    MiningSparks.SetActive(false);
                 }
-                this.WorkLight.color = new Color(1f, 0.55f, 0.1f, 1f);
+
+                if (meState == eState.eOutOfPower || meState == eState.eOutOfPowerVeinDepleted || meState == eState.eDrillStuck)
+                {
+                    WorkLight.range = 2f;
+                    WorkLight.enabled = true;
+                    WorkLight.color = Color.red;
+                    WorkLight.intensity = (float) (Mathf.Sin(mrTimeElapsed * 8f) * 4.0 + 4.0);
+                }
+
+                if (meState == eState.eOutOfStorage || meState == eState.eOutOfStorageVeinDepleted)
+                    WorkLight.color = Color.green;
+                if (meState == eState.eSearchingForOre || meState == eState.eOutOfStorage)
+                {
+                    WorkLight.intensity = (float) (Mathf.Sin(mrTimeElapsed * 8f) * 4.0 + 4.0);
+                    WorkLight.enabled = true;
+                    WorkLight.range = 2f;
+                }
+                else
+                {
+                    if (meState != eState.eMining)
+                        return;
+                    if (mDotWithPlayerForwards > 0.0)
+                    {
+                        if (mDistanceToPlayer < 32.0)
+                            mrTimeUntilFlash -= Time.deltaTime;
+                    }
+                    else if (mDistanceToPlayer < 4.0)
+                        mrTimeUntilFlash -= Time.deltaTime;
+
+                    if (mrTimeUntilFlash < 0.0)
+                    {
+                        mrTimeUntilFlash = 1f;
+                        WorkLight.intensity = 4f;
+                        WorkLight.enabled = true;
+                        WorkLight.range = 5f;
+                        if (meState == eState.eOutOfPower)
+                            WorkLight.intensity = 4f;
+                    }
+
+                    WorkLight.intensity *= 0.75f;
+                    if (WorkLight.intensity >= 0.100000001490116)
+                        return;
+                    WorkLight.enabled = false;
+                }
+            }
+        }
+
+        private void CalcEfficiencyAndDepleteRate()
+        {
+            mnDrillRate = (int) Mathf.Ceil(GetDrillRateForTier(mnDrillTier) / DifficultySettings.mrResourcesFactor);
+            mnDepleteCount = Mathf.CeilToInt(mnDrillRate / mrEfficiency);
+            mnBonusOre = 0;
+            mnBonusDeplete = 0;
+            if (base_efficiency > 1.0)
+            {
+                mnBonusOre = (int) (mnDrillRate * (base_efficiency - 1.0));
+                mnBonusDeplete = (int) (mnDepleteCount * (base_efficiency - 1.0));
+            }
+
+            if (mnBonusOre < 0)
+                Debug.LogError("Error, bonus ore of " + mnBonusOre);
+            if (mnBonusDeplete < 0)
+                Debug.LogError("Error, bonus depletion of " + mnBonusDeplete);
+            mnMaxOre = 15 + mnDrillRate + mnBonusOre;
+            if (mnMaxOre > 100)
+                mnMaxOre = 100;
+            if (mnDrillRate <= 3)
+                OreCollectionRate = 1f;
+            else if (mnDrillRate % 2 != 0)
+            {
+                if (mnDrillRate == 11)
+                    OreCollectionRate = 1f;
+                else if (mnDrillRate == 21)
+                {
+                    OreCollectionRate = 3f;
+                }
+                else
+                {
+                    Debug.LogError("Error, " + mnDrillRate + " doesn't divide into 2!");
+                    OreCollectionRate = 1f;
+                }
             }
             else
             {
-                this.DrillChunks.SetActive(false);
-                this.MiningSparks.SetActive(false);
-            }
-            if (this.meState == eState.eOutOfPower || this.meState == eState.eOutOfPowerVeinDepleted || this.meState == eState.eDrillStuck)
-            {
-                this.WorkLight.range = 2f;
-                this.WorkLight.enabled = true;
-                this.WorkLight.color = Color.red;
-                this.WorkLight.intensity = Mathf.Sin(this.mrTimeElapsed * 8f) * 4f + 4f;
-            }
-            if (this.meState == eState.eOutOfStorage || this.meState == eState.eOutOfStorageVeinDepleted)
-            {
-                this.WorkLight.color = Color.green;
-            }
-            if (this.meState == eState.eSearchingForOre || this.meState == eState.eOutOfStorage)
-            {
-                this.WorkLight.intensity = Mathf.Sin(this.mrTimeElapsed * 8f) * 4f + 4f;
-                this.WorkLight.enabled = true;
-                this.WorkLight.range = 2f;
-            }
-            else if (this.meState == eState.eMining)
-            {
-                if (base.mDotWithPlayerForwards > 0f)
-                {
-                    if (base.mDistanceToPlayer < 32f)
-                    {
-                        this.mrTimeUntilFlash -= Time.deltaTime;
-                    }
-                }
-                else if (base.mDistanceToPlayer < 4f)
-                {
-                    this.mrTimeUntilFlash -= Time.deltaTime;
-                }
-                if (this.mrTimeUntilFlash < 0f)
-                {
-                    this.mrTimeUntilFlash = 1f;
-                    this.WorkLight.intensity = 4f;
-                    this.WorkLight.enabled = true;
-                    this.WorkLight.range = 5f;
-                    if (this.meState == eState.eOutOfPower)
-                    {
-                        this.WorkLight.intensity = 4f;
-                    }
-                }
-                this.WorkLight.intensity *= 0.75f;
-                if (this.WorkLight.intensity < 0.1f)
-                {
-                    this.WorkLight.enabled = false;
-                }
+                OreCollectionRate = mnDrillRate / 2;
+                if (OreCollectionRate <= 8.0 || OreCollectionRate % 8.0 != 0.0)
+                    return;
+                OreCollectionRate /= 8f;
             }
         }
-    }
 
-    private void CalcEfficiencyAndDepleteRate()
-    {
-        this.mnDrillRate = (int)Mathf.Ceil((float)this.GetDrillRateForTier(this.mnDrillTier) / DifficultySettings.mrResourcesFactor);
-        this.mnDepleteCount = Mathf.CeilToInt((float)this.mnDrillRate / this.mrEfficiency);
-        this.mnBonusOre = 0;
-        this.mnBonusDeplete = 0;
-        if (this.base_efficiency > 1f)
+        private int GetDrillRateForTier(int lnDrillTier)
         {
-            this.mnBonusOre = (int)((float)this.mnDrillRate * (this.base_efficiency - 1f));
-            this.mnBonusDeplete = (int)((float)this.mnDepleteCount * (this.base_efficiency - 1f));
-            Debug.LogWarning("Recalc of Deplete gives " + this.mnBonusOre + " bonus ore and " + this.mnBonusDeplete + " depletion rate.");
-        }
-        if (this.mnBonusOre < 0)
-        {
-            Debug.LogError("Error, bonus ore of " + this.mnBonusOre);
-        }
-        if (this.mnBonusDeplete < 0)
-        {
-            Debug.LogError("Error, bonus depletion of " + this.mnBonusDeplete);
-        }
-        this.mnMaxOre = 15 + this.mnDrillRate + this.mnBonusOre;
-        if (this.mnDrillRate <= 3)
-        {
-            this.OreCollectionRate = 1f;
-        }
-        else if (this.mnDrillRate % 2 != 0)
-        {
-            if (this.mnDrillRate == 11)
+            switch (lnDrillTier)
             {
-                this.OreCollectionRate = 1f;
+                case 0:
+                    return 1;
+                case 1:
+                    return 2;
+                case 2:
+                    return 4;
+                case 3:
+                    return 8;
+                case 4:
+                    return 16;
+                case 5:
+                    return 32;
+                default:
+                    Debug.LogError("Error, drill tier " + lnDrillTier + " is illegal!");
+                    return -1;
             }
-            else if (this.mnDrillRate == 21)
+        }
+
+        public void SetTieredUpgrade(int lnTier)
+        {
+            if (lnTier > 0)
+                ARTHERPetSurvival.mbLocatedUpgradedMotor = true;
+            mnDrillTier = lnTier;
+            mnDrillRate = GetDrillRateForTier(mnDrillTier);
+            mnMaxOre = 15 + mnDrillRate + mnBonusOre;
+            if (DifficultySettings.mrResourcesFactor == 0.0)
+                Debug.LogError("Extractor loaded before difficulty settings were!");
+            CalcEfficiencyAndDepleteRate();
+            mrPowerUsage = 0.5f;
+            if (DifficultySettings.mbEasyPower)
+                mrPowerUsage *= 0.5f;
+            if (mnDrillTier == 0)
+                mrPowerUsage *= 0.25f;
+            mrPowerUsage += (mnDrillRate - 1) / 2f;
+        }
+
+        public string GetDrillMotorName()
+        {
+            if (mnDrillTier == 0)
+                return PersistentSettings.GetString("Economy_Drill_Motor");
+            return ItemManager.GetItemName(GetDrillMotorID());
+        }
+
+        public string GetCutterHeadName()
+        {
+            if (mnCutterTier == 1)
+                return PersistentSettings.GetString("Standard_Cutter_Head");
+            return ItemManager.GetItemName(GetCutterHeadID());
+        }
+
+
+        public void SetCutterUpgrade(ItemDurability cutterHead)
+        {
+            int mnCutterTier = this.mnCutterTier;
+            if (cutterHead == null)
             {
-                this.OreCollectionRate = 3f;
+                this.mnCutterTier = 1;
+                mnCutterDurability = 10000;
             }
             else
             {
-                Debug.LogError("Error, " + this.mnDrillRate + " doesn't divide into 2!");
-                this.OreCollectionRate = 1f;
+                this.mnCutterTier = OreExtractor.GetCutterTierFromItem(cutterHead.mnItemID);
+                mnCutterDurability = cutterHead.mnCurrentDurability;
             }
-        }
-        else
-        {
-            this.OreCollectionRate = (float)(this.mnDrillRate / 2);
-            if (this.OreCollectionRate > 8f && this.OreCollectionRate % 8f == 0f)
-            {
-                this.OreCollectionRate /= 8f;
-            }
-        }
-    }
 
-    private int GetDrillRateForTier(int lnDrillTier)
-    {
-        switch (lnDrillTier)
+            if (this.mnCutterTier > mnCutterTier && mDistanceToPlayer < 128.0 && mDotWithPlayerForwards > 0.0)
+                FloatingCombatTextManager.instance.QueueText(mnX, mnY + 1L, mnZ, 1.05f, PersistentSettings.GetString("Upgraded"), Color.cyan, 1f, 64f);
+            CalculateEfficiency();
+            if (meState == eState.eDrillStuck && CheckHardness())
+                meState = eState.eSearchingForOre;
+            CalcEfficiencyAndDepleteRate();
+        }
+
+        public static int GetCutterTierFromItem(int itemID)
         {
-            case 0:
-                return 1;
-            case 1:
+            if (itemID == OreExtractor.STEEL_HEAD_ID)
                 return 2;
-            case 2:
+            if (itemID == OreExtractor.CRYSTAL_HEAD_ID)
+                return 3;
+            if (itemID == OreExtractor.ORGANIC_HEAD_ID)
                 return 4;
-            case 3:
-                return 8;
-            case 4:
-                return 16;
-            case 5:
-                return 32;
-            default:
-                Debug.LogError("Error, drill tier " + lnDrillTier + " is illegal!");
-                return -1;
+            return itemID == OreExtractor.PLASMA_HEAD_ID ? 5 : 1;
         }
-    }
 
-    public void SetTieredUpgrade(int lnTier)
-    {
-        if (lnTier > 0)
+        public override bool ShouldSave()
         {
-            ARTHERPetSurvival.mbLocatedUpgradedMotor = true;
+            return true;
         }
-        this.mnDrillTier = lnTier;
-        this.mnDrillRate = this.GetDrillRateForTier(this.mnDrillTier);
-        this.mnMaxOre = 15 + this.mnDrillRate + this.mnBonusOre;
-        if (DifficultySettings.mrResourcesFactor == 0f)
-        {
-            Debug.LogError("Extractor loaded before difficulty settings were!");
-        }
-        this.CalcEfficiencyAndDepleteRate();
-        this.mrPowerUsage = 0.5f;
-        if (DifficultySettings.mbEasyPower)
-        {
-            this.mrPowerUsage *= 0.5f;
-        }
-        if (this.mnDrillTier == 0)
-        {
-            this.mrPowerUsage *= 0.25f;
-        }
-        this.mrPowerUsage += (float)(this.mnDrillRate - 1) / 2f;
-    }
 
-    public string GetDrillMotorName()
-    {
-        if (this.mnDrillTier == 0)
+        public override void Write(BinaryWriter writer)
         {
-            return PersistentSettings.GetString("Economy_Drill_Motor");
+            try
+            {
+                writer.Write(mnStoredOre);
+                writer.Write(mnOreType);
+                writer.Write(mrCurrentPower);
+                writer.Write(ExtractionX);
+                writer.Write(ExtractionY);
+                writer.Write(ExtractionZ);
+                writer.Write(mnCutterDurability);
+                writer.Write(mnCutterTier);
+                long num1 = 0;
+                writer.Write(num1);
+                writer.Write(mnDrillTier);
+                float num2 = 0.0f;
+                writer.Write(mbReportOffline);
+                bool flag = false;
+                writer.Write(flag);
+                writer.Write(flag);
+                writer.Write(flag);
+                writer.Write(mrIssueTime);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+                writer.Write(num2);
+            }
+            catch (Exception e)
+            {
+                Logging.LogException(e);
+            }
         }
-        return ItemManager.GetItemName(this.GetDrillMotorID());
-    }
 
-    public string GetCutterHeadName()
-    {
-        if (this.mnCutterTier == 1)
+        public override void Read(BinaryReader reader, int entityVersion)
         {
-            return PersistentSettings.GetString("Standard_Cutter_Head");
+            try
+            {
+                mnStoredOre = reader.ReadInt32();
+                mnOreType = reader.ReadUInt16();
+                mrCurrentPower = reader.ReadSingle();
+                ExtractionX = reader.ReadInt64();
+                ExtractionY = reader.ReadInt64();
+                ExtractionZ = reader.ReadInt64();
+                mnCutterDurability = reader.ReadInt32();
+                mnCutterTier = reader.ReadInt32();
+                if (mnCutterTier == 0)
+                    mnCutterTier = 1;
+                if (mnCutterTier == 1)
+                    mnCutterDurability = 10000;
+                if (!mSegment.mbValidateOnly)
+                    CalculateEfficiency();
+                reader.ReadInt64();
+                mnDrillTier = reader.ReadInt32();
+                if (mnDrillTier <= 0)
+                    mnDrillTier = 0;
+                if (mnDrillTier > 5)
+                    mnDrillTier = 5;
+                if (!mSegment.mbValidateOnly)
+                    SetTieredUpgrade(mnDrillTier);
+                mbReportOffline = reader.ReadBoolean();
+                bool flag = reader.ReadBoolean();
+                flag = reader.ReadBoolean();
+                flag = reader.ReadBoolean();
+                mrIssueTime = reader.ReadSingle();
+                double num1 = reader.ReadSingle();
+                double num2 = reader.ReadSingle();
+                double num3 = reader.ReadSingle();
+                double num4 = reader.ReadSingle();
+                double num5 = reader.ReadSingle();
+                double num6 = reader.ReadSingle();
+                double num7 = reader.ReadSingle();
+                double num8 = reader.ReadSingle();
+                double num9 = reader.ReadSingle();
+                double num10 = reader.ReadSingle();
+                double num11 = reader.ReadSingle();
+                double num12 = reader.ReadSingle();
+                double num13 = reader.ReadSingle();
+                if (ExtractionX == 0L || ExtractionX == mnX && ExtractionY == mnY && ExtractionZ == mnZ)
+                    SetNewState(eState.eFetchingEntryPoint);
+                else
+                    SetNewState(eState.eFetchingExtractionPoint);
+                ARTHERPetSurvival.instance.GotOre(mnOreType);
+            }
+            catch (Exception e)
+            {
+                Logging.LogException(e);
+            }
         }
-        return ItemManager.GetItemName(this.GetCutterHeadID());
-    }
 
-    public void SetCutterUpgrade(ItemDurability cutterHead)
-    {
-        int num = this.mnCutterTier;
-        if (cutterHead == null)
-        {
-            this.mnCutterTier = 1;
-            this.mnCutterDurability = 10000;
-        }
-        else
-        {
-            this.mnCutterTier = OreExtractor.GetCutterTierFromItem(cutterHead.mnItemID);
-            this.mnCutterDurability = cutterHead.mnCurrentDurability;
-        }
-        if (this.mnCutterTier > num && base.mDistanceToPlayer < 128f && base.mDotWithPlayerForwards > 0f)
-        {
-            FloatingCombatTextManager.instance.QueueText(base.mnX, base.mnY + 1, base.mnZ, 1.05f, PersistentSettings.GetString("Upgraded"), Color.cyan, 1f, 64f);
-        }
-        this.CalculateEfficiency();
-        if (this.meState == eState.eDrillStuck && this.CheckHardness())
-        {
-            this.meState = eState.eSearchingForOre;
-        }
-        this.CalcEfficiencyAndDepleteRate();
-    }
 
-    public static int GetCutterTierFromItem(int itemID)
-    {
-        if (itemID == OreExtractor.STEEL_HEAD_ID)
+        public override bool ShouldNetworkUpdate()
         {
-            return 2;
+            return true;
         }
-        if (itemID == OreExtractor.CRYSTAL_HEAD_ID)
-        {
-            return 3;
-        }
-        if (itemID == OreExtractor.ORGANIC_HEAD_ID)
-        {
-            return 4;
-        }
-        if (itemID == OreExtractor.PLASMA_HEAD_ID)
-        {
-            return 5;
-        }
-        return 1;
-    }
 
-    public override bool ShouldSave()
-    {
-        return true;
-    }
+        public override void WriteNetworkUpdate(BinaryWriter writer)
+        {
+            try { 
+            base.WriteNetworkUpdate(writer);
+            writer.Write((int) meState);
+            writer.Write(mrTimeUntilNextOre);
+            writer.Write(mnEstimatedOreLeft);
+            writer.Write(mrEfficiency);
+            writer.Write(mrWorkTime);
+            writer.Write(mrIdleTime);
+            writer.Write(EntryX);
+            writer.Write(EntryY);
+            writer.Write(EntryZ);
+            }
+            catch (Exception e)
+            {
+                Logging.LogException(e);
+            }
+        }
 
-    public override void Write(BinaryWriter writer)
-    {
-        writer.Write(this.mnStoredOre);
-        writer.Write(this.mnOreType);
-        writer.Write(this.mrCurrentPower);
-        writer.Write(this.ExtractionX);
-        writer.Write(this.ExtractionY);
-        writer.Write(this.ExtractionZ);
-        writer.Write(this.mnCutterDurability);
-        writer.Write(this.mnCutterTier);
-        long value = 0L;
-        writer.Write(value);
-        writer.Write(this.mnDrillTier);
-        float value2 = 0f;
-        writer.Write(this.mbReportOffline);
-        bool value3 = false;
-        writer.Write(value3);
-        writer.Write(value3);
-        writer.Write(value3);
-        writer.Write(this.mrIssueTime);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-        writer.Write(value2);
-    }
+        public override void ReadNetworkUpdate(BinaryReader reader)
+        {
+            try { 
+            base.ReadNetworkUpdate(reader);
+            meState = (eState) reader.ReadInt32();
+            mrTimeUntilNextOre = reader.ReadSingle();
+            mnEstimatedOreLeft = reader.ReadInt32();
+            mrEfficiency = reader.ReadSingle();
+            mrWorkTime = reader.ReadSingle();
+            mrIdleTime = reader.ReadSingle();
+            EntryX = reader.ReadInt64();
+            EntryY = reader.ReadInt64();
+            EntryZ = reader.ReadInt64();
+            }
+            catch (Exception e)
+            {
+                Logging.LogException(e);
+            }
+        }
 
-    public override void Read(BinaryReader reader, int entityVersion)
-    {
-        this.mnStoredOre = reader.ReadInt32();
-        this.mnOreType = reader.ReadUInt16();
-        this.mrCurrentPower = reader.ReadSingle();
-        this.ExtractionX = reader.ReadInt64();
-        this.ExtractionY = reader.ReadInt64();
-        this.ExtractionZ = reader.ReadInt64();
-        this.mnCutterDurability = reader.ReadInt32();
-        this.mnCutterTier = reader.ReadInt32();
-        if (this.mnCutterTier == 0)
+        public bool DropStoredOre()
         {
-            this.mnCutterTier = 1;
+            if (mnStoredOre == 0)
+                return false;
+            ItemManager.DropNewCubeStack(mnOreType, TerrainData.GetDefaultValue(mnOreType), mnStoredOre, mnX, mnY, mnZ, Vector3.zero);
+            mnStoredOre = 0;
+            MarkDirtyDelayed();
+            return true;
         }
-        if (this.mnCutterTier == 1)
-        {
-            this.mnCutterDurability = 10000;
-        }
-        if (!base.mSegment.mbValidateOnly)
-        {
-            this.CalculateEfficiency();
-        }
-        reader.ReadInt64();
-        this.mnDrillTier = reader.ReadInt32();
-        if (this.mnDrillTier <= 0)
-        {
-            this.mnDrillTier = 0;
-        }
-        if (this.mnDrillTier > 5)
-        {
-            this.mnDrillTier = 5;
-        }
-        if (!base.mSegment.mbValidateOnly)
-        {
-            this.SetTieredUpgrade(this.mnDrillTier);
-        }
-        this.mbReportOffline = reader.ReadBoolean();
-        bool flag = reader.ReadBoolean();
-        flag = reader.ReadBoolean();
-        flag = reader.ReadBoolean();
-        this.mrIssueTime = reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        reader.ReadSingle();
-        if (this.ExtractionX == 0 || (this.ExtractionX == base.mnX && this.ExtractionY == base.mnY && this.ExtractionZ == base.mnZ))
-        {
-            this.SetNewState(eState.eFetchingEntryPoint);
-        }
-        else
-        {
-            this.SetNewState(eState.eFetchingExtractionPoint);
-        }
-        ARTHERPetSurvival.instance.GotOre(this.mnOreType);
-    }
 
-    public override bool ShouldNetworkUpdate()
-    {
-        return true;
-    }
-
-    public override void WriteNetworkUpdate(BinaryWriter writer)
-    {
-        base.WriteNetworkUpdate(writer);
-        writer.Write((int)this.meState);
-        writer.Write(this.mrTimeUntilNextOre);
-        writer.Write(this.mnEstimatedOreLeft);
-        writer.Write(this.mrEfficiency);
-        writer.Write(this.mrWorkTime);
-        writer.Write(this.mrIdleTime);
-        writer.Write(this.EntryX);
-        writer.Write(this.EntryY);
-        writer.Write(this.EntryZ);
-    }
-
-    public override void ReadNetworkUpdate(BinaryReader reader)
-    {
-        base.ReadNetworkUpdate(reader);
-        int num = (int)(this.meState = (eState)reader.ReadInt32());
-        this.mrTimeUntilNextOre = reader.ReadSingle();
-        this.mnEstimatedOreLeft = reader.ReadInt32();
-        this.mrEfficiency = reader.ReadSingle();
-        this.mrWorkTime = reader.ReadSingle();
-        this.mrIdleTime = reader.ReadSingle();
-        this.EntryX = reader.ReadInt64();
-        this.EntryY = reader.ReadInt64();
-        this.EntryZ = reader.ReadInt64();
-    }
-
-    public bool DropStoredOre()
-    {
-        if (this.mnStoredOre == 0)
+        public ItemBase GetStoredOre()
         {
-            return false;
+            if (mnOreType == 0)
+                return null;
+            if (mnStoredOre == 0)
+                return null;
+            return ItemManager.SpawnCubeStack(mnOreType, TerrainData.GetDefaultValue(mnOreType), mnStoredOre);
         }
-        ItemManager.DropNewCubeStack(this.mnOreType, TerrainData.GetDefaultValue(this.mnOreType), this.mnStoredOre, base.mnX, base.mnY, base.mnZ, Vector3.zero);
-        this.mnStoredOre = 0;
-        this.MarkDirtyDelayed();
-        return true;
-    }
 
-    public ItemBase GetStoredOre()
-    {
-        if (this.mnOreType == 0)
+        public void ClearStoredOre()
         {
-            return null;
+            mnStoredOre = 0;
+            MarkDirtyDelayed();
+            RequestImmediateNetworkUpdate();
         }
-        if (this.mnStoredOre == 0)
+
+        public int GetCutterHeadID()
         {
-            return null;
+            if (mnCutterTier > 1)
+                return 198 + mnCutterTier;
+            return -1;
         }
-        return ItemManager.SpawnCubeStack(this.mnOreType, TerrainData.GetDefaultValue(this.mnOreType), this.mnStoredOre);
-    }
 
-    public void ClearStoredOre()
-    {
-        this.mnStoredOre = 0;
-        this.MarkDirtyDelayed();
-        this.RequestImmediateNetworkUpdate();
-    }
-
-    public int GetCutterHeadID()
-    {
-        if (this.mnCutterTier > 1)
+        public void DropCurrentCutterHead()
         {
-            return 198 + this.mnCutterTier;
-        }
-        return -1;
-    }
-
-    public void DropCurrentCutterHead()
-    {
-        if (this.mnCutterTier > 1)
-        {
-            if (this.mnCutterTier > 1)
+            if (mnCutterTier <= 1)
+                return;
+            if (mnCutterTier > 1)
             {
                 Debug.LogWarning("Dropping cutter head!");
-                ItemDurability itemDurability = ItemManager.SpawnItem(this.GetCutterHeadID()) as ItemDurability;
-                itemDurability.mnCurrentDurability = this.mnCutterDurability;
-                ItemManager.instance.DropItem(itemDurability, base.mnX, base.mnY, base.mnZ, Vector3.zero);
+                ItemDurability itemDurability = ItemManager.SpawnItem(GetCutterHeadID()) as ItemDurability;
+                itemDurability.mnCurrentDurability = mnCutterDurability;
+                ItemManager.instance.DropItem(itemDurability, mnX, mnY, mnZ, Vector3.zero);
             }
-            this.mnCutterTier = 1;
-            this.mnCutterDurability = 10000;
-            this.CalculateEfficiency();
-            this.MarkDirtyDelayed();
-        }
-    }
 
-    public ItemBase GetCutterHead()
-    {
-        if (this.mnCutterTier > 1)
+            mnCutterTier = 1;
+            mnCutterDurability = 10000;
+            CalculateEfficiency();
+            MarkDirtyDelayed();
+        }
+
+        public ItemBase GetCutterHead()
         {
-            ItemDurability itemDurability = ItemManager.SpawnItem(this.GetCutterHeadID()) as ItemDurability;
-            itemDurability.mnCurrentDurability = this.mnCutterDurability;
+            if (mnCutterTier <= 1)
+                return null;
+            ItemDurability itemDurability = ItemManager.SpawnItem(GetCutterHeadID()) as ItemDurability;
+            itemDurability.mnCurrentDurability = mnCutterDurability;
             return itemDurability;
         }
-        return null;
-    }
 
-    public bool IsValidCutterHead(ItemBase newCutterHeadItem)
-    {
-        return newCutterHeadItem.mnItemID >= OreExtractor.STEEL_HEAD_ID && newCutterHeadItem.mnItemID <= OreExtractor.PLASMA_HEAD_ID;
-    }
-
-    public void SwapCutterHead(ItemBase newCutterHeadItem)
-    {
-        if (newCutterHeadItem == null)
+        public bool IsValidCutterHead(ItemBase newCutterHeadItem)
         {
-            this.SetCutterUpgrade(null);
-            this.MarkDirtyDelayed();
-        }
-        else
-        {
-            if (!this.IsValidCutterHead(newCutterHeadItem))
-            {
-                throw new AssertException("Tried to set extractor cutter head to invalid cutter head item: " + newCutterHeadItem.mnItemID);
-            }
-            this.SetCutterUpgrade(newCutterHeadItem as ItemDurability);
-            this.MarkDirtyDelayed();
-        }
-    }
-
-    public bool AttemptUpgradeCutterHead(Player player)
-    {
-        Debug.LogWarning("AttemptUpgradeCutterHead!");
-        if (player != WorldScript.mLocalPlayer)
-        {
+            if (newCutterHeadItem.mnItemID >= OreExtractor.STEEL_HEAD_ID)
+                return newCutterHeadItem.mnItemID <= OreExtractor.PLASMA_HEAD_ID;
             return false;
         }
-        ItemBase itemBase = null;
-        int num = this.mnCutterTier;
-        foreach (ItemBase item in player.mInventory)
+
+        public void SwapCutterHead(ItemBase newCutterHeadItem)
         {
-            if (item.mType == ItemType.ItemDurability)
+            if (newCutterHeadItem == null)
             {
-                int cutterTierFromItem = OreExtractor.GetCutterTierFromItem(item.mnItemID);
-                if (cutterTierFromItem > num)
-                {
-                    num = cutterTierFromItem;
-                    itemBase = item;
-                }
-            }
-        }
-        if (itemBase != null)
-        {
-            Debug.LogWarning("Located new, higher tier of cutter head");
-            player.mInventory.RemoveSpecificItem(itemBase);
-            this.DropCurrentCutterHead();
-            this.SetCutterUpgrade(itemBase as ItemDurability);
-            this.MarkDirtyDelayed();
-            return true;
-        }
-        Debug.LogWarning("Player had nothing to upgrade the head to");
-        return false;
-    }
-
-    public int GetDrillMotorID()
-    {
-        if (this.mnDrillTier > 0)
-        {
-            return 2999 + this.mnDrillTier;
-        }
-        return -1;
-    }
-
-    public void DropCurrentDrillMotor()
-    {
-        if (this.mnDrillTier > 0)
-        {
-            ItemBase item = ItemManager.SpawnItem(this.GetDrillMotorID());
-            if (ItemManager.instance.DropItem(item, base.mnX, base.mnY, base.mnZ, Vector3.zero) == null)
-            {
-                Debug.LogError("ERROR! ORE EXTRACTOR FAILED TO DROPEXISTING DRILL MOTOR!");
-            }
-        }
-        this.mnDrillTier = 0;
-        this.MarkDirtyDelayed();
-    }
-
-    public bool IsValidMotor(ItemBase newMotorItem)
-    {
-        if (newMotorItem.mnItemID >= 3000 && newMotorItem.mnItemID <= 3004)
-        {
-            return this.mnDrillTier != newMotorItem.mnItemID - 2999;
-        }
-        return false;
-    }
-
-    public ItemBase GetMotor()
-    {
-        if (this.mnDrillTier > 0)
-        {
-            return ItemManager.SpawnItem(this.GetDrillMotorID());
-        }
-        return null;
-    }
-
-    public void SwapMotor(ItemBase newMotorItem)
-    {
-        if (newMotorItem == null)
-        {
-            this.SetTieredUpgrade(0);
-            this.MarkDirtyDelayed();
-        }
-        else if (this.mnDrillTier != newMotorItem.mnItemID - 2999)
-        {
-            if (!this.IsValidMotor(newMotorItem))
-            {
-                throw new AssertException("Tried to set extractor drill motor to invalid motor item: " + newMotorItem.mnItemID);
-            }
-            int tieredUpgrade = newMotorItem.mnItemID - 2999;
-            this.SetTieredUpgrade(tieredUpgrade);
-            this.MarkDirtyDelayed();
-        }
-    }
-
-    public bool AttemptUpgradeDrillMotor(Player player)
-    {
-        if (player != WorldScript.mLocalPlayer)
-        {
-            return false;
-        }
-        int num = 0;
-        int num2 = 5;
-        while (num2 > 0)
-        {
-            if (player.mInventory.GetItemCount(2999 + num2) <= 0)
-            {
-                num2--;
-                continue;
-            }
-            num = num2;
-            break;
-        }
-        if (this.mnDrillTier < num)
-        {
-            player.mInventory.RemoveItem(2999 + num, 1);
-            this.DropCurrentDrillMotor();
-            this.SetTieredUpgrade(num);
-            this.MarkDirtyDelayed();
-            return true;
-        }
-        return false;
-    }
-
-    public override void OnDelete()
-    {
-        if (WorldScript.mbIsServer)
-        {
-            this.DropCurrentDrillMotor();
-            this.DropCurrentCutterHead();
-            this.DropStoredOre();
-        }
-        base.OnDelete();
-    }
-
-    public bool PlayerExtractStoredOre(Player player)
-    {
-        if (player == WorldScript.mLocalPlayer && !player.mInventory.CollectValue(this.mnOreType, 0, this.mnStoredOre))
-        {
-            return false;
-        }
-        this.mnStoredOre = 0;
-        this.MarkDirtyDelayed();
-        this.RequestImmediateNetworkUpdate();
-        return true;
-    }
-
-    public float GetRemainingPowerCapacity()
-    {
-        return this.mrMaxPower - this.mrCurrentPower;
-    }
-
-    public float GetMaximumDeliveryRate()
-    {
-        return 10f + (float)(this.mnDrillRate * 3);
-    }
-
-    public float GetMaxPower()
-    {
-        return this.mrMaxPower;
-    }
-
-    public bool DeliverPower(float amount)
-    {
-        if (amount > this.GetRemainingPowerCapacity())
-        {
-            return false;
-        }
-        this.mrCurrentPower += amount;
-        this.MarkDirtyDelayed();
-        return true;
-    }
-
-    public bool WantsPowerFromEntity(SegmentEntity entity)
-    {
-        return true;
-    }
-
-    public override HoloMachineEntity CreateHolobaseEntity(Holobase holobase)
-    {
-        HolobaseEntityCreationParameters holobaseEntityCreationParameters = new HolobaseEntityCreationParameters(this);
-        holobaseEntityCreationParameters.RequiresUpdates = true;
-        holobaseEntityCreationParameters.AddVisualisation(holobase.OreExtractor);
-        return holobase.CreateHolobaseEntity(holobaseEntityCreationParameters);
-    }
-
-    public override void HolobaseUpdate(Holobase holobase, HoloMachineEntity holoMachineEntity)
-    {
-        if (this.meState == eState.eMining || this.meState == eState.eVeinDepleted)
-        {
-            holoMachineEntity.VisualisationObjects[0].transform.Search("Drill Rot").gameObject.GetComponent<RotateConstantlyScript>().ZRot = 8f;
-            holobase.SetColour(holoMachineEntity.VisualisationObjects[0], Color.yellow);
-        }
-        else
-        {
-            GameObject gameObject = holoMachineEntity.VisualisationObjects[0].transform.Search("Drill Rot").gameObject;
-            gameObject.GetComponent<RotateConstantlyScript>().ZRot *= 0.9f;
-            float num = 1f;
-            if (holobase.mnUpdates % 60 < 30)
-            {
-                num = 0f;
-            }
-            Color lCol = new Color(num, 0f, 0f, 1f);
-            if (this.meState == eState.eDrillStuck)
-            {
-                lCol = new Color(num, 1f - num, 0f, 1f);
-            }
-            if (this.meState == eState.eOutOfPower)
-            {
-                lCol = new Color(num, 0f, 1f - num, 1f);
-            }
-            if (this.meState == eState.eOutOfStorage)
-            {
-                lCol = new Color(num, 1f - num, 1f - num, 1f);
-            }
-            holobase.SetColour(holoMachineEntity.VisualisationObjects[0], lCol);
-            gameObject = gameObject.transform.Search("Drill GFX").gameObject;
-            holobase.SetTint(gameObject, new Color(1f - num, 0f, 0f, 1f));
-        }
-    }
-
-    public void ProcessStorageSupplier(StorageMachineInterface storage)
-    {
-        if (this.mnStoredOre > 0)
-        {
-            this.mnStoredOre -= storage.TryPartialInsert(this, this.mnOreType, TerrainData.GetDefaultValue(this.mnOreType), this.mnStoredOre);
-        }
-    }
-
-    public override string GetPopupText()
-    {
-
-        string @string = this.MachineName;
-        string text = @string;
-        @string = text + ".\n" + PersistentSettings.GetString("Power") + " " + this.mrCurrentPower.ToString("F0") + "/" + this.mrMaxPower.ToString("F0");
-        string text2 = TerrainData.GetNameForValue(this.mnOreType, 0);
-        if (!WorldScript.mLocalPlayer.mResearch.IsKnown(this.mnOreType, 0))
-        {
-            text2 = "Unknown Material";
-        }
-        text = @string;
-        @string = text + "\n(T) : " + PersistentSettings.GetString("Offline_Warning") + " : " + this.mbReportOffline;
-        if (Input.GetKeyDown(KeyCode.T))
-        {
-            InfExtractorMachineWindow.ToggleReport(WorldScript.mLocalPlayer, this);
-        }
-        string cutterHeadName = this.GetCutterHeadName();
-        if (this.meState == eState.eDrillStuck)
-        {
-            @string = @string + "\n" + PersistentSettings.GetString("Drill_Stuck") + ".";
-            @string += cutterHeadName;
-            @string = @string + " " + PersistentSettings.GetString("Cant_Dig") + "\n";
-            @string = @string + text2 + ". " + PersistentSettings.GetString("Fit_Head");
-        }
-        else
-        {
-            if (this.mnOreType == 0)
-            {
-                @string = @string + "\n" + PersistentSettings.GetString("OE_Searching");
+                SetCutterUpgrade(null);
+                MarkDirtyDelayed();
             }
             else
             {
-                text = @string;
-                @string = text + "\n" + PersistentSettings.GetString("Next") + " " + text2 + " " + PersistentSettings.GetString("In") + this.mrTimeUntilNextOre.ToString("F0");
+                if (!IsValidCutterHead(newCutterHeadItem))
+                    throw new AssertException("Tried to set extractor cutter head to invalid cutter head item: " + newCutterHeadItem.mnItemID);
+                SetCutterUpgrade(newCutterHeadItem as ItemDurability);
+                MarkDirtyDelayed();
             }
-            text = @string;
-            @string = text + ". " + PersistentSettings.GetString("Total_Stored") + this.mnStoredOre;
         }
-        float num = (float)this.mnDrillRate / 1f * DifficultySettings.mrResourcesFactor;
-        num = (float)this.mnDrillRate;
-        @string += string.Format("\n{0}. {1}: {2:P0}", this.GetDrillMotorName(), PersistentSettings.GetString("Drill_Rate"), num);
-        float num2 = (float)this.mnCutterDurability / 10000f;
-        @string += string.Format("\n{0} : {1:P0} {2}", cutterHeadName, num2, PersistentSettings.GetString("Durability"));
-        text = @string;
-        @string = text + "\n" + PersistentSettings.GetString("Work_Efficiency") + " : " + this.mrEfficiency.ToString("P0") + " " + PersistentSettings.GetString("Q_Reset");
-        int num3 = (int)((float)this.mnDrillRate * 60f / 30f);
-        float num4 = this.mrPowerUsage * DifficultySettings.mrResourcesFactor;
-        text = @string;
-        @string = text + "\n" + num3 + " " + PersistentSettings.GetString("Ore_Per_Min") + ". " + PersistentSettings.GetString("Demand") + num4.ToString("F2") + " " + PersistentSettings.GetString("Power_Per_Second");
-        text = @string;
-        @string = text + "\n" + PersistentSettings.GetString("Average_PPS") + " : " + this.mrAveragePPS.ToString("F2");
-        float num5 = this.mrWorkTime + this.mrIdleTime;
-        float num6 = this.mrWorkTime / num5;
-        text = @string;
-        @string = text + "\n" + PersistentSettings.GetString("Work_Efficiency") + " : " + num6.ToString("P2") + " - " + PersistentSettings.GetString("Q_Reset");
-        if (Input.GetKey(KeyCode.Q))
+
+        public bool AttemptUpgradeCutterHead(Player player)
         {
-            this.mrWorkTime = 0f;
-            this.mrIdleTime = 0f;
+            Debug.LogWarning("AttemptUpgradeCutterHead!");
+            if (player != WorldScript.mLocalPlayer)
+                return false;
+            ItemBase itemBase1 = null;
+            int num = mnCutterTier;
+            foreach (ItemBase itemBase2 in player.mInventory)
+            {
+                if (itemBase2.mType == ItemType.ItemDurability)
+                {
+                    int cutterTierFromItem = OreExtractor.GetCutterTierFromItem(itemBase2.mnItemID);
+                    if (cutterTierFromItem > num)
+                    {
+                        num = cutterTierFromItem;
+                        itemBase1 = itemBase2;
+                    }
+                }
+            }
+
+            if (itemBase1 != null)
+            {
+                Debug.LogWarning("Located new, higher tier of cutter head");
+                player.mInventory.RemoveSpecificItem(itemBase1);
+                DropCurrentCutterHead();
+                SetCutterUpgrade(itemBase1 as ItemDurability);
+                MarkDirtyDelayed();
+                return true;
+            }
+
+            Debug.LogWarning("Player had nothing to upgrade the head to");
+            return false;
         }
-        if (Input.GetButton("Extract") && Input.GetKey(KeyCode.LeftControl) && InfExtractorMachineWindow.DropStoredOre(WorldScript.mLocalPlayer, this))
+
+        public int GetDrillMotorID()
         {
-            AudioHUDManager.instance.Pick();
-            Achievements.instance.UnlockAchievement(Achievements.eAchievements.eExtractedOre, false);
+            if (mnDrillTier > 0)
+                return 2999 + mnDrillTier;
+            return -1;
         }
-        return @string;
+
+        public void DropCurrentDrillMotor()
+        {
+            if (mnDrillTier > 0)
+            {
+                ItemBase itemBase = ItemManager.SpawnItem(GetDrillMotorID());
+                if (ItemManager.instance.DropItem(itemBase, mnX, mnY, mnZ, Vector3.zero) == null)
+                    Debug.LogError("ERROR! ORE EXTRACTOR FAILED TO DROPEXISTING DRILL MOTOR!");
+            }
+
+            mnDrillTier = 0;
+            MarkDirtyDelayed();
+        }
+
+
+        public bool IsValidMotor(ItemBase newMotorItem)
+        {
+            if (newMotorItem.mnItemID < 3000 || newMotorItem.mnItemID > 3004)
+                return false;
+            return mnDrillTier != newMotorItem.mnItemID - 2999;
+        }
+
+        public ItemBase GetMotor()
+        {
+            if (mnDrillTier > 0)
+                return ItemManager.SpawnItem(GetDrillMotorID());
+            return null;
+        }
+
+        public void SwapMotor(ItemBase newMotorItem)
+        {
+            if (newMotorItem == null)
+            {
+                SetTieredUpgrade(0);
+                MarkDirtyDelayed();
+            }
+            else
+            {
+                if (mnDrillTier == newMotorItem.mnItemID - 2999)
+                    return;
+                if (!IsValidMotor(newMotorItem))
+                    throw new AssertException("Tried to set extractor drill motor to invalid motor item: " + newMotorItem.mnItemID);
+                SetTieredUpgrade(newMotorItem.mnItemID - 2999);
+                MarkDirtyDelayed();
+            }
+        }
+
+        public bool AttemptUpgradeDrillMotor(Player player)
+        {
+            if (player != WorldScript.mLocalPlayer)
+                return false;
+            int lnTier = 0;
+            for (int index = 5; index > 0; --index)
+            {
+                if (player.mInventory.GetItemCount(2999 + index) > 0)
+                {
+                    lnTier = index;
+                    break;
+                }
+            }
+
+            if (mnDrillTier >= lnTier)
+                return false;
+            player.mInventory.RemoveItem(2999 + lnTier, 1);
+            DropCurrentDrillMotor();
+            SetTieredUpgrade(lnTier);
+            MarkDirtyDelayed();
+            return true;
+        }
+
+        public override void OnDelete()
+        {
+            if (WorldScript.mbIsServer)
+            {
+                DropCurrentDrillMotor();
+                DropCurrentCutterHead();
+                DropStoredOre();
+            }
+
+            base.OnDelete();
+        }
+
+        public bool PlayerExtractStoredOre(Player player)
+        {
+            if (player == WorldScript.mLocalPlayer && !player.mInventory.CollectValue(mnOreType, 0, mnStoredOre))
+                return false;
+            ARTHERPetSurvival.instance.GotOre(mnOreType);
+            mnStoredOre = 0;
+            MarkDirtyDelayed();
+            RequestImmediateNetworkUpdate();
+            return true;
+        }
+
+
+        public float GetRemainingPowerCapacity()
+        {
+            return mrMaxPower - mrCurrentPower;
+        }
+
+        public float GetMaximumDeliveryRate()
+        {
+            return 10f + mnDrillRate * 3;
+        }
+
+        public float GetMaxPower()
+        {
+            return mrMaxPower;
+        }
+
+        public bool DeliverPower(float amount)
+        {
+            if (amount > (double) GetRemainingPowerCapacity())
+                return false;
+            mrCurrentPower += amount;
+            MarkDirtyDelayed();
+            return true;
+        }
+
+        public bool WantsPowerFromEntity(SegmentEntity entity)
+        {
+            return true;
+        }
+
+        public override HoloMachineEntity CreateHolobaseEntity(Holobase holobase)
+        {
+            HolobaseEntityCreationParameters parameters = new HolobaseEntityCreationParameters(this);
+            parameters.RequiresUpdates = true;
+            parameters.AddVisualisation(holobase.OreExtractor);
+            return holobase.CreateHolobaseEntity(parameters);
+        }
+
+
+        public override void HolobaseUpdate(Holobase holobase, HoloMachineEntity holoMachineEntity)
+        {
+            if (meState == eState.eMining || meState == eState.eVeinDepleted)
+            {
+                holoMachineEntity.VisualisationObjects[0].transform.Search("Drill Rot").gameObject.GetComponent<RotateConstantlyScript>().ZRot = 8f;
+                holobase.SetColour(holoMachineEntity.VisualisationObjects[0], Color.yellow);
+            }
+            else
+            {
+                GameObject gameObject = holoMachineEntity.VisualisationObjects[0].transform.Search("Drill Rot").gameObject;
+                gameObject.GetComponent<RotateConstantlyScript>().ZRot *= 0.9f;
+                float num = 1f;
+                if (holobase.mnUpdates % 60 < 30)
+                {
+                    num = 0f;
+                }
+
+                Color lCol = new Color(num, 0f, 0f, 1f);
+                if (meState == eState.eDrillStuck)
+                {
+                    lCol = new Color(num, 1f - num, 0f, 1f);
+                }
+
+                if (meState == eState.eOutOfPower)
+                {
+                    lCol = new Color(num, 0f, 1f - num, 1f);
+                }
+
+                if (meState == eState.eOutOfStorage)
+                {
+                    lCol = new Color(num, 1f - num, 1f - num, 1f);
+                }
+
+                holobase.SetColour(holoMachineEntity.VisualisationObjects[0], lCol);
+                gameObject = gameObject.transform.Search("Drill GFX").gameObject;
+                holobase.SetTint(gameObject, new Color(1f - num, 0f, 0f, 1f));
+            }
+        }
+
+        public string Name
+        {
+            get { return mName; }
+        }
+
+        public ushort OreType
+        {
+            get { return mnOreType; }
+        }
+
+        public string DrillMotorName
+        {
+            get { return GetDrillMotorName(); }
+        }
+
+        public float Efficiency
+        {
+            get { return mrEfficiency; }
+        }
+
+        public int DrillTier
+        {
+            get { return mnDrillTier; }
+        }
+
+        public int DrillRate
+        {
+            get { return mnDrillRate; }
+        }
+
+        public float BonusOre
+        {
+            get { return mnBonusOre; }
+        }
+
+        public OreExtractor.eState State
+        {
+            get { return (OreExtractor.eState) (int) meState; }
+        }
+
+        public float IssueTime
+        {
+            get { return mrIssueTime; }
+            set { mrIssueTime = value; }
+        }
+
+        public bool ReportOffline
+        {
+            get { return mbReportOffline; }
+            set { mbReportOffline = value; }
+        }
+
+        public string CutterHeadName
+        {
+            get { return GetCutterHeadName(); }
+        }
+
+        public int CutterTier
+        {
+            get { return mnCutterTier; }
+        }
+
+        public int CutterHeadID
+        {
+            get { return GetCutterHeadID(); }
+        }
+
+        public ItemBase CutterHead
+        {
+            get { return GetCutterHead(); }
+        }
+
+        public int CutterDurability
+        {
+            get { return mnCutterDurability; }
+        }
+
+        public float CurrentPower
+        {
+            get { return mrCurrentPower; }
+            set { mrCurrentPower = value; }
+        }
+
+        public void ProcessStorageSupplier(StorageMachineInterface storage)
+        {
+            if (mnStoredOre <= 0)
+                return;
+            int num = storage.TryPartialInsert(this, mnOreType, TerrainData.GetDefaultValue(mnOreType), mnStoredOre);
+            mnStoredOre -= num;
+            if (num == 0)
+                return;
+            mrIssueTime = 0.0f;
+            ARTHERPetSurvival.instance.GotOre(mnOreType);
+        }
+
+
+        public override string GetPopupText()
+        {
+            InfOreExtractor extractor = this;
+            string str1 = mMachineName + " - " + string.Format(PersistentSettings.GetString("Power_X_X"), extractor.mrCurrentPower.ToString("F0"),
+                              extractor.mrMaxPower.ToString("F0"));
+            string str2 = TerrainData.GetNameForValue(extractor.mnOreType, 0);
+            if (!WorldScript.mLocalPlayer.mResearch.IsKnown(extractor.mnOreType, 0))
+                str2 = "Unknown Material";
+            string str3 = str1 + "\n(T) : " + PersistentSettings.GetString("Offline_Warning") + " : " + extractor.mbReportOffline;
+            if (Input.GetKeyDown(KeyCode.T))
+            {
+                InfExtractorMachineWindow.ToggleReport(WorldScript.mLocalPlayer, extractor);
+                MarkDirtyDelayed();
+            }
+
+            string cutterHeadName = extractor.GetCutterHeadName();
+            string str4 = extractor.meState != eState.eDrillStuck
+                ? (extractor.mnOreType != (ushort) 0
+                      ? str3 + "\n" + string.Format(PersistentSettings.GetString("Next_X_in_X"), str2, extractor.mrTimeUntilNextOre.ToString("F0"))
+                      : str3 + "\n" + PersistentSettings.GetString("OE_Searching")).ToString() + PersistentSettings.GetString("Total_Stored") + extractor.mnStoredOre
+                : str3 + "\n" + PersistentSettings.GetString("Drill_Stuck") + "." + cutterHeadName + " " + PersistentSettings.GetString("Cant_Dig") + "\n" + str2 + ". " +
+                  PersistentSettings.GetString("Fit_Head");
+            float num1 = extractor.mnDrillRate / 1f * DifficultySettings.mrResourcesFactor;
+            float mnDrillRate = extractor.mnDrillRate;
+            string str5 = str4 + string.Format("\n{0}. {1}: {2:P0}", extractor.GetDrillMotorName(), PersistentSettings.GetString("Drill_Rate"), mnDrillRate);
+            float num2 = extractor.mnCutterDurability / 10000f;
+            if (extractor.mnCutterTier == 0)
+                str5 += string.Format("\n{0} : {1:P0} {2}", cutterHeadName, num2, PersistentSettings.GetString("Durability"));
+            int num3 = (int) (extractor.mnDrillRate * 60.0 / 30.0);
+            float num4 = extractor.mrPowerUsage * DifficultySettings.mrResourcesFactor;
+            string str6 = str5 + "\n" + PersistentSettings.GetString("Average_PPS") + " : " + extractor.mrAveragePPS.ToString("F2");
+            float num5 = extractor.mrWorkTime + extractor.mrIdleTime;
+            float num6 = extractor.mrWorkTime / num5;
+            string str7 = str6 + "\n" + PersistentSettings.GetString("Work_Efficiency") + " : " + num6.ToString("P2") + " - " + PersistentSettings.GetString("Q_Reset");
+            if (Input.GetKey(KeyCode.Q))
+            {
+                extractor.mrWorkTime = 0.0f;
+                extractor.mrIdleTime = 0.0f;
+            }
+
+            if (Input.GetButton("Extract") && Input.GetKey(KeyCode.LeftControl) && InfExtractorMachineWindow.DropStoredOre(WorldScript.mLocalPlayer, extractor))
+            {
+                AudioHUDManager.instance.Pick();
+                Achievements.instance.UnlockAchievement(Achievements.eAchievements.eExtractedOre, false);
+            }
+
+            return str7;
+        }
+
     }
 }
