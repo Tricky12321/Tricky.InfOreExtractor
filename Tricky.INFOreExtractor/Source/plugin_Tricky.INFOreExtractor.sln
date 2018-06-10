@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2036
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "plugin_Tricky.INFOreExtractor", "plugin_Tricky.INFOreExtractor.csproj", "{ADFD1C71-9DD4-4A6D-8193-E29D6F5B0BDA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ADFD1C71-9DD4-4A6D-8193-E29D6F5B0BDA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADFD1C71-9DD4-4A6D-8193-E29D6F5B0BDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADFD1C71-9DD4-4A6D-8193-E29D6F5B0BDA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADFD1C71-9DD4-4A6D-8193-E29D6F5B0BDA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8A694AC6-0304-47DF-8F16-CDE4150EB0F6}
+	EndGlobalSection
+EndGlobal

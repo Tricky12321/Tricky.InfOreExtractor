@@ -1,0 +1,21 @@
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\bin\Debug\plugin_Tricky.INFOreExtractor.dll
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\bin\Debug\plugin_Tricky.INFOreExtractor.pdb
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\bin\Debug\Assembly-CSharp.dll
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\bin\Debug\MadVandal.ESMSModInterfaces.dll
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\bin\Debug\System.Core.dll
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\bin\Debug\System.dll
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\bin\Debug\UnityEngine.dll
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.csprojResolveAssemblyReference.cache
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.csproj.CoreCompileInputs.cache
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.dll
+C:\Users\Tricky\Desktop\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.pdb
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\bin\Debug\plugin_Tricky.INFOreExtractor.dll
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\bin\Debug\plugin_Tricky.INFOreExtractor.pdb
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\bin\Debug\Assembly-CSharp.dll
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\bin\Debug\System.Core.dll
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\bin\Debug\System.dll
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\bin\Debug\UnityEngine.dll
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.csprojResolveAssemblyReference.cache
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.csproj.CoreCompileInputs.cache
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.dll
+C:\Users\Tricky\Desktop\FCE Source\Tricky.INFOreExtractor\Source\obj\Debug\plugin_Tricky.INFOreExtractor.pdb

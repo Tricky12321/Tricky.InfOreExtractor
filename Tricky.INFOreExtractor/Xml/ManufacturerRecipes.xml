@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfCraftData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<CraftData>
+		<Category>mining</Category>
+		<Tier>0</Tier>
+		<Key>Tricky.StockInfOreExtractor</Key>
+		<CraftedKey>Tricky.StockInfOreExtractor</CraftedKey>
+		<CraftedAmount>1</CraftedAmount>
+		<Costs>
+			<CraftCost>
+				<Key>TitaniumBar</Key>
+				<Amount>250</Amount>
+			</CraftCost>
+			<CraftCost>
+				<Key>GoldBar</Key>
+				<Amount>250</Amount>
+			</CraftCost>
+			<CraftCost>
+				<Key>NickelBar</Key>
+				<Amount>250</Amount>
+			</CraftCost>
+		</Costs>
+		<Description>Automatically extracts ore from the vein it is attached to. Internal storage capacity can be extended with a Storage Hopper. Requires power. Can be upgraded.</Description>
+		<Hint>Connect to Hoppers for automatic storage</Hint>
+	</CraftData>
+	<CraftData>
+		<Category>mining</Category>
+		<Tier>0</Tier>
+		<Key>Tricky.AdvancedInfOreExtractor</Key>
+		<CraftedKey>Tricky.AdvancedInfOreExtractor</CraftedKey>
+		<CraftedAmount>1</CraftedAmount>
+		<Costs>
+			<CraftCost>
+				<Key>MolybdenumBar</Key>
+				<Amount>500</Amount>
+			</CraftCost>
+			<CraftCost>
+				<Key>ChromiumBar</Key>
+				<Amount>500</Amount>
+			</CraftCost>
+		</Costs>
+		<Description>Automatically extracts ore from the vein it is attached to. Internal storage capacity can be extended with a Storage Hopper. Requires power. Can be upgraded.</Description>
+		<Hint>Connect to Hoppers for automatic storage</Hint>
+	</CraftData>
+</ArrayOfCraftData>
