@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MadVandal.FortressCraft;
 using UnityEngine;
 
 namespace Tricky.InfiniteOreExtractor
@@ -19,105 +20,115 @@ namespace Tricky.InfiniteOreExtractor
 
         public const string InterfaceToggleReport = "ToggleReport";
 
-        private bool dirty;
+        private static bool mDirty;
 
-        private InfOreExtractor.eState lastState;
+        private InfOreExtractor.eState mLastState;
 
-        private float lastOreTime;
+        private float mLastOreTime;
 
-        private int lastDurability;
+        private int mLastDurability;
 
-        private int lastCount;
+        private int mLastCount;
 
-        private float powerPeriod;
+        private float mPowerPeriod;
+
 
         public override void SpawnWindow(SegmentEntity targetEntity)
         {
+            GenericMachinePanelHelper.SetPanelSizeAndPosition(365, 568, 0, 323);
+
             InfOreExtractor infOreExtractor = targetEntity as InfOreExtractor;
             if (infOreExtractor == null)
-            {
-                GenericMachinePanelScript.instance.Hide();
-                UIManager.RemoveUIRules("Machine");
-            }
-            else
-            {
-                float x = GenericMachinePanelScript.instance.Label_Holder.transform.position.x;
-                float y = GenericMachinePanelScript.instance.Label_Holder.transform.position.y;
-                GenericMachinePanelScript.instance.Label_Holder.transform.position = new Vector3(x, y, 69.3f);
-                base.manager.SetTitle("Infinite Ore Extractor");
-                base.manager.AddPowerBar("power", 0, 0);
-                base.manager.AddButton("power_button", "Add Power", 180, 0);
-                base.manager.AddIcon("cutter_head", "empty", Color.white, 0, 65);
-                base.manager.AddBigLabel("cutter_head_name", string.Empty, Color.white, 60, 55);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "cutter_head_durability", "100%", Color.white, false, 60, 75);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "cutter_head_hint", "Click icon to upgrade", Color.white, false, 170, 75);
-                base.manager.AddIcon("drill_motor", "empty", Color.white, 0, 123);
-                base.manager.AddBigLabel("drill_motor_name", string.Empty, Color.white, 60, 113);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "drill_motor_speed", "2x speed", Color.white, false, 60, 133);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "drill_motor_hint", "Click icon to upgrade", Color.white, false, 170, 133);
-                base.manager.AddBigLabel("status", "Drill Stuck", Color.white, 0, 185);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "efficiency", "100% efficiency", Color.white, false, 170, 175);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "opm", "8 ore per minute", Color.white, false, 170, 195);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "power_usage", "3 per sec", Color.white, false, 170, 215);
-                base.manager.AddHugeLabel("storage_count", "99", Color.white, 5, 274);
-                base.manager.AddIcon("storage_icon", "Copper Ore", Color.white, 45, 274);
-                base.manager.AddRadialFillIcon("storage_next_icon", "Copper Ore", 1f, Color.white, 45, 274);
-                base.manager.AddBigLabel("storage_type", "Copper Ore", Color.white, 100, 274);
-                base.manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "storage_hint", "Click icon to retrieve", Color.white, false, 170, 298);
-                this.dirty = true;
-                this.lastOreTime = 30f;
-                this.lastDurability = 10000;
-                this.lastCount = 99;
-            }
+                return;
+
+            float x = GenericMachinePanelScript.instance.Label_Holder.transform.position.x;
+            float y = GenericMachinePanelScript.instance.Label_Holder.transform.position.y;
+            GenericMachinePanelScript.instance.Label_Holder.transform.position = new Vector3(x, y, 69.3f);
+            manager.SetTitle("Infinite Ore Extractor");
+            manager.AddPowerBar("power", 0, 0);
+            manager.AddButton("power_button", "Add Power", 180, 0); 
+
+            manager.AddIcon("cutter_head", "empty", Color.white, 0, 75);
+            manager.AddBigLabel("cutter_head_name", string.Empty, Color.white, 60, 65);
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "cutter_head_durability", "100%", Color.white, false, 60, 85);
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "cutter_head_hint", "Click icon to upgrade", Color.white, false, 160, 85);
+
+            manager.AddIcon("drill_motor", "empty", Color.white, 0, 143);
+            manager.AddBigLabel("drill_motor_name", string.Empty, Color.white, 60, 133);
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "drill_motor_speed", "2x speed", Color.white, false, 60, 153);
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "drill_motor_hint", "Click icon to upgrade", Color.white, false, 160, 153);
+
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "efficiency", "100% efficiency", Color.white, false, 80, 195);
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "opm", "8 ore per minute", Color.white, false, 80, 215);
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "power_usage", "3 per sec", Color.white, false, 80, 235);
+
+            manager.AddBigLabel("status", "Drill Stuck", Color.white, 0, 268);
+
+            manager.AddHugeLabel("storage_count", "99", Color.white, 0, 316);
+            manager.AddIcon("storage_icon", "Copper Ore", Color.white, 60, 309);
+            manager.AddRadialFillIcon("storage_next_icon", "Copper Ore", 1f, Color.white, 61, 313);
+            manager.AddBigLabel("storage_type", "Copper Ore", Color.white, 115, 307);
+            manager.AddLabel(GenericMachineManager.LabelType.OneLineFullWidth, "storage_hint", "Click icon to retrieve", Color.white, false, 115, 330);
+            mDirty = true;
+            mLastOreTime = 30f;
+            mLastDurability = 10000;
+            mLastCount = 99;
         }
 
-        public override void UpdateMachine(SegmentEntity targetEntity)
+
+        public override void UpdateMachine(SegmentEntity targetEntity) 
         {
             InfOreExtractor infOreExtractor = targetEntity as InfOreExtractor;
-            base.manager.UpdatePowerBar("power", infOreExtractor.mrCurrentPower, infOreExtractor.mrMaxPower);
-            if (infOreExtractor.meState != this.lastState)
+            manager.UpdatePowerBar("power", infOreExtractor.mrCurrentPower, infOreExtractor.mrMaxPower);
+            if (infOreExtractor.meState != mLastState)
             {
-                this.dirty = true;
+                mDirty = true;
             }
             if (targetEntity.mbNetworkUpdated)
             {
-                this.dirty = true;
+                mDirty = true;
                 targetEntity.mbNetworkUpdated = false;
             }
-            if (this.dirty)
+            if (mDirty)
             {
-                this.UpdateState(infOreExtractor);
-                this.dirty = false;
+                UpdateState(infOreExtractor);
+                mDirty = false;
             }
             if (infOreExtractor.meState == InfOreExtractor.eState.eMining || infOreExtractor.meState == InfOreExtractor.eState.eVeinDepleted)
             {
-                this.UpdateMining(infOreExtractor);
+                UpdateMining(infOreExtractor);
             }
         }
 
+
+        public override void OnClose(SegmentEntity targetEntity)
+        {
+            base.OnClose(targetEntity);
+            GenericMachinePanelHelper.RestoreOriginalWindowState();
+        }
+
+
         private void UpdateState(InfOreExtractor extractor)
         {
-            this.lastState = extractor.meState;
+            mLastState = extractor.meState;
             string text = "empty";
             int cutterHeadID = extractor.GetCutterHeadID();
             if (cutterHeadID >= 0)
             {
                 text = ItemEntry.mEntries[cutterHeadID].Sprite;
             }
-            Debug.Log("cutter head icon: " + text);
-            base.manager.UpdateIcon("cutter_head", text, Color.white);
-            base.manager.UpdateLabel("cutter_head_name", extractor.GetCutterHeadName(), Color.white);
+            manager.UpdateIcon("cutter_head", text, Color.white);
+            manager.UpdateLabel("cutter_head_name", extractor.GetCutterHeadName(), Color.white);
             text = "empty";
             int drillMotorID = extractor.GetDrillMotorID();
             if (drillMotorID >= 0)
             {
                 text = ItemEntry.mEntries[drillMotorID].Sprite;
             }
-            Debug.Log("drill motor icon: " + text);
-            base.manager.UpdateIcon("drill_motor", text, Color.white);
-            base.manager.UpdateLabel("drill_motor_name", extractor.GetDrillMotorName(), Color.white);
+            manager.UpdateIcon("drill_motor", text, Color.white);
+            manager.UpdateLabel("drill_motor_name", extractor.GetDrillMotorName(), Color.white);
             string label = ((float)extractor.mnDrillRate / 1f).ToString("F2") + "x " + PersistentSettings.GetString("Speed");
-            base.manager.UpdateLabel("drill_motor_speed", label, Color.white);
+            manager.UpdateLabel("drill_motor_speed", label, Color.white);
             string label2 = "Error:" + extractor.meState;
             Color color = Color.white;
             switch (extractor.meState)
@@ -148,13 +159,13 @@ namespace Tricky.InfiniteOreExtractor
                     color = Color.red;
                     break;
             }
-            base.manager.UpdateLabel("status", label2, color);
-            base.manager.UpdateLabel("efficiency", string.Format("{0:P0} {1}", extractor.mrEfficiency, PersistentSettings.GetString("Efficiency")), Color.white);
+            manager.UpdateLabel("status", label2, color);
+            manager.UpdateLabel("efficiency", string.Format("{0:P0} {1}", extractor.mrEfficiency, PersistentSettings.GetString("Efficiency")), Color.white);
             int num = extractor.mnDrillRate + extractor.mnBonusOre;
             int num2 = (int)((float)num * 2f);
-            base.manager.UpdateLabel("opm", string.Format("{0} {1}", num2, PersistentSettings.GetString("Ore_Per_Min")), Color.white);
+            manager.UpdateLabel("opm", string.Format("{0} {1}", num2, PersistentSettings.GetString("Ore_Per_Min")), Color.white);
             float num3 = extractor.mrPowerUsage * DifficultySettings.mrResourcesFactor;
-            base.manager.UpdateLabel("power_usage", string.Format("{0} {1}", num3.ToString("N2"), PersistentSettings.GetString("Power_Per_Second")), Color.white);
+            manager.UpdateLabel("power_usage", string.Format("{0} {1}", num3.ToString("N2"), PersistentSettings.GetString("Power_Per_Second")), Color.white);
             string newIcon = "empty";
             string label3 = string.Empty;
             if (extractor.mnOreType != 0)
@@ -167,59 +178,59 @@ namespace Tricky.InfiniteOreExtractor
                     label3 = "Unknown Material";
                 }
             }
-            base.manager.UpdateLabel("storage_type", label3, Color.white);
+            manager.UpdateLabel("storage_type", label3, Color.white);
             if (extractor.meState == InfOreExtractor.eState.eMining || extractor.meState == InfOreExtractor.eState.eVeinDepleted)
             {
-                base.manager.UpdateIcon("storage_icon", newIcon, Color.grey);
-                base.manager.UpdateIcon("storage_next_icon", newIcon, Color.white);
+                manager.UpdateIcon("storage_icon", newIcon, Color.grey);
+                manager.UpdateIcon("storage_next_icon", newIcon, Color.white);
             }
             else
             {
-                base.manager.UpdateIcon("storage_icon", newIcon, Color.white);
-                base.manager.UpdateIcon("storage_next_icon", "empty", Color.white);
-                this.lastDurability = extractor.mnCutterDurability;
-                float num4 = (float)this.lastDurability / 10000f;
+                manager.UpdateIcon("storage_icon", newIcon, Color.white);
+                manager.UpdateIcon("storage_next_icon", "empty", Color.white);
+                mLastDurability = extractor.mnCutterDurability;
+                float num4 = (float)mLastDurability / 10000f;
                 if (extractor.mnCutterDurability == 0)
                 {
-                    base.manager.UpdateLabel("cutter_head_durability", string.Empty, Color.white);
+                    manager.UpdateLabel("cutter_head_durability", string.Empty, Color.white);
                 }
                 else
                 {
-                    base.manager.UpdateLabel("cutter_head_durability", extractor.mnCutterDurability.ToString("F0"), Color.white);
+                    manager.UpdateLabel("cutter_head_durability", extractor.mnCutterDurability.ToString("F0"), Color.white);
                 }
-                this.lastCount = extractor.mnStoredOre;
+                mLastCount = extractor.mnStoredOre;
                 Color color2 = Color.white;
-                if (this.lastCount == 0)
+                if (mLastCount == 0)
                 {
                     color2 = Color.grey;
                 }
-                base.manager.UpdateLabel("storage_count", string.Format("{0,2:##}", this.lastCount), color2);
+                manager.UpdateLabel("storage_count", string.Format("{0,2:##}", mLastCount), color2);
             }
         }
 
         private void UpdateMining(InfOreExtractor extractor)
         {
-            if (extractor.mrTimeUntilNextOre != this.lastOreTime)
+            if (extractor.mrTimeUntilNextOre != mLastOreTime)
             {
-                this.lastOreTime = extractor.mrTimeUntilNextOre;
-                float fill = this.lastOreTime / 30f;
-                base.manager.UpdateIconFill("storage_next_icon", fill);
+                mLastOreTime = extractor.mrTimeUntilNextOre;
+                float fill = mLastOreTime / 30f;
+                manager.UpdateIconFill("storage_next_icon", fill);
             }
-            if (extractor.mnCutterDurability != this.lastDurability)
+            if (extractor.mnCutterDurability != mLastDurability)
             {
-                this.lastDurability = extractor.mnCutterDurability;
-                float num = (float)this.lastDurability / 10000f;
-                base.manager.UpdateLabel("cutter_head_durability", extractor.mnCutterDurability.ToString("F0"), Color.white);
+                mLastDurability = extractor.mnCutterDurability;
+                float num = (float)mLastDurability / 10000f;
+                manager.UpdateLabel("cutter_head_durability", extractor.mnCutterDurability.ToString("F0"), Color.white);
             }
-            if (extractor.mnStoredOre != this.lastCount)
+            if (extractor.mnStoredOre != mLastCount)
             {
-                this.lastCount = extractor.mnStoredOre;
+                mLastCount = extractor.mnStoredOre;
                 Color color = Color.white;
-                if (this.lastCount == 0)
+                if (mLastCount == 0)
                 {
                     color = Color.grey;
                 }
-                base.manager.UpdateLabel("storage_count", string.Format("{0,2:##}", this.lastCount), color);
+                manager.UpdateLabel("storage_count", string.Format("{0,2:##}", mLastCount), color);
             }
         }
 
@@ -231,8 +242,7 @@ namespace Tricky.InfiniteOreExtractor
                 if (infOreExtractor.AttemptUpgradeDrillMotor(WorldScript.mLocalPlayer))
                 {
                     AudioHUDManager.instance.Pick();
-                    this.dirty = true;
-                    Debug.Log("drill motor upgraded");
+                    mDirty = true;
                     if (!WorldScript.mbIsServer)
                     {
                         ItemBase motor = infOreExtractor.GetMotor();
@@ -246,7 +256,7 @@ namespace Tricky.InfiniteOreExtractor
                 if (infOreExtractor.AttemptUpgradeCutterHead(WorldScript.mLocalPlayer))
                 {
                     AudioHUDManager.instance.Pick();
-                    this.dirty = true;
+                    mDirty = true;
                     if (!WorldScript.mbIsServer)
                     {
                         ItemBase cutterHead = infOreExtractor.GetCutterHead();
@@ -266,14 +276,14 @@ namespace Tricky.InfiniteOreExtractor
                     {
                         NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceTakeOres, null, null, infOreExtractor, 0f);
                     }
-                    this.dirty = true;
+                    mDirty = true;
                     return true;
                 }
             }
-            else if (name.Equals("power_button") && !WorldScript.mbIsServer && this.powerPeriod > 0f)
+            else if (name.Equals("power_button") && !WorldScript.mbIsServer && mPowerPeriod > 0f)
             {
-                NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceAddPower, null, null, infOreExtractor, this.powerPeriod);
-                this.powerPeriod = 0f;
+                NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceAddPower, null, null, infOreExtractor, mPowerPeriod);
+                mPowerPeriod = 0f;
             }
             return false;
         }
@@ -338,13 +348,13 @@ namespace Tricky.InfiniteOreExtractor
         public override void ButtonDown(string name, SegmentEntity targetEntity)
         {
             InfOreExtractor infOreExtractor = targetEntity as InfOreExtractor;
-            if (name.Equals("power_button") && InfExtractorMachineWindow.AddPower(WorldScript.mLocalPlayer, infOreExtractor, Time.deltaTime) && !WorldScript.mbIsServer)
+            if (name.Equals("power_button") && AddPower(WorldScript.mLocalPlayer, infOreExtractor, Time.deltaTime) && !WorldScript.mbIsServer)
             {
-                this.powerPeriod += Time.deltaTime;
-                if (this.powerPeriod >= 1f)
+                mPowerPeriod += Time.deltaTime;
+                if (mPowerPeriod >= 1f)
                 {
                     NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceAddPower, null, null, infOreExtractor, 1f);
-                    this.powerPeriod -= 1f;
+                    mPowerPeriod -= 1f;
                 }
             }
         }
@@ -375,7 +385,7 @@ namespace Tricky.InfiniteOreExtractor
                 if (swapitem == null)
                 {
                     infOreExtractor.SwapMotor(null);
-                    this.dirty = true;
+                    mDirty = true;
                     if (!WorldScript.mbIsServer)
                     {
                         NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceSwapMotor, null, null, infOreExtractor, 0f);
@@ -390,7 +400,7 @@ namespace Tricky.InfiniteOreExtractor
                         return false;
                     }
                     infOreExtractor.SwapMotor(swapitem);
-                    this.dirty = true;
+                    mDirty = true;
                     if (!WorldScript.mbIsServer)
                     {
                         NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceSwapMotor, null, swapitem, infOreExtractor, 0f);
@@ -403,7 +413,7 @@ namespace Tricky.InfiniteOreExtractor
                 if (swapitem == null)
                 {
                     infOreExtractor.SwapCutterHead(null);
-                    this.dirty = true;
+                    mDirty = true;
                     if (!WorldScript.mbIsServer)
                     {
                         NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceSwapCutterHead, null, null, infOreExtractor, 0f);
@@ -413,7 +423,7 @@ namespace Tricky.InfiniteOreExtractor
                 if (infOreExtractor.IsValidCutterHead(swapitem))
                 {
                     infOreExtractor.SwapCutterHead(swapitem);
-                    this.dirty = true;
+                    mDirty = true;
                     if (!WorldScript.mbIsServer)
                     {
                         NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceSwapCutterHead, null, swapitem, infOreExtractor, 0f);
@@ -433,7 +443,7 @@ namespace Tricky.InfiniteOreExtractor
                     NetworkManager.instance.SendInterfaceCommand(InterfaceName, InterfaceTakeOres, null, null, infOreExtractor, 0f);
                 }
                 Achievements.instance.UnlockAchievement(Achievements.eAchievements.eExtractedOre, false);
-                this.dirty = true;
+                mDirty = true;
                 return true;
             }
             return false;
@@ -462,7 +472,7 @@ namespace Tricky.InfiniteOreExtractor
                         return;
                     }
                     infOreExtractor.SwapMotor(draggedItem);
-                    this.dirty = true;
+                    mDirty = true;
                     InventoryPanelScript.MarkDirty();
                     if (!WorldScript.mbIsServer)
                     {
@@ -476,7 +486,7 @@ namespace Tricky.InfiniteOreExtractor
                 if (dragDelegate(draggedItem, cutterHead))
                 {
                     infOreExtractor.SwapCutterHead(draggedItem);
-                    this.dirty = true;
+                    mDirty = true;
                     InventoryPanelScript.MarkDirty();
                     if (!WorldScript.mbIsServer)
                     {
@@ -502,7 +512,7 @@ namespace Tricky.InfiniteOreExtractor
                     infOreExtractor.SwapCutterHead(nic.itemContext);
                     break;
                 case InterfaceAddPower:
-                    InfExtractorMachineWindow.AddPower(player, infOreExtractor, nic.holdPeriod);
+                    AddPower(player, infOreExtractor, nic.holdPeriod);
                     break;
                 case InterfaceDropOres:
                     infOreExtractor.ClearStoredOre();
@@ -537,6 +547,11 @@ namespace Tricky.InfiniteOreExtractor
                 }
             }
             return list;
+        }
+
+        public static void SetDirty()
+        {
+            mDirty = true;
         }
     }
 }

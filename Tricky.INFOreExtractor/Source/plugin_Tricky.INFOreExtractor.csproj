@@ -32,21 +32,25 @@
   <ItemGroup>
     <Reference Include="Assembly-CSharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Assembly-CSharp.dll</HintPath>
+      <HintPath>..\..\..\..\FCMods\FCVersion20Libs\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>..\..\..\..\FCMods\FCVersion20Libs\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
     <Reference Include="System">
       <HintPath>C:\WINDOWS\assembly\GAC_MSIL\System\2.0.0.0__b77a5c561934e089\System.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\UnityEngine.dll</HintPath>
+      <HintPath>..\..\..\..\FCMods\FCVersion20Libs\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="InfExtractorMachineWindow.cs" />
     <Compile Include="InfOreExtractor.cs" />
     <Compile Include="InfOreExtractorMain.cs" />
-    <Compile Include="Logging.cs" />
+    <Compile Include="MV FortressCraft\GenericMachinePanelHelper.cs" />
+    <Compile Include="MV FortressCraft\Logging.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -55,9 +59,12 @@
     <Content Include="Xml\TerrainData.xml" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="mod.config" />
+    <None Include="mod.config">
+      <SubType>Designer</SubType>
+    </None>
     <None Include="WorkshopFileId.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>if not exist %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1 mkdir %25LOCALAPPDATA%25\ProjectorGames\FortressCraft\Mods\Tricky.INFOreExtractor\1

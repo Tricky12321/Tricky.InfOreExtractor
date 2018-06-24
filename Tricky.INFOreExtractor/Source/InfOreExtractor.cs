@@ -1,7 +1,7 @@
+using MadVandal.FortressCraft;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using MadVandal.FortressCraft;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
@@ -54,7 +54,7 @@ namespace Tricky.InfiniteOreExtractor
         private long EntryY;
         private long EntryZ;
         public eState meState;
-        public float mrExtractionTime = 30f;
+        public float mrExtractionTime = EXTRACTION_TIME;
         public float mrPowerUsage = 0.5f;
         public float mrSparePowerCapacity;
         private Queue<CubeCoord> queuedLocations;
@@ -93,11 +93,30 @@ namespace Tricky.InfiniteOreExtractor
 
         private static InfOreExtractor ErroryExtractor;
 
-        private Color mCubeColor;
-        private string mMachineName;
-        private int mTierUpgrade;
+        private readonly Color mCubeColor;
+        private readonly string mMachineName;
+        private readonly int mTierUpgrade;
 
-        public InfOreExtractor(Segment segment, long x, long y, long z, ushort cube, byte flags, ushort lValue, bool wasLoaded) : base(eSegmentEntity.Mod, SpawnableObjectEnum.OreExtractor, x, y,
+        public const ushort MIN_ORE_VALUE = 1;
+        public const ushort MAX_ORE_VALUE = 2560;
+        public const int MAX_SEARCH_STEPS = 16384;
+        public const float EXTRACTION_TIME = 30f;
+        public const int MAX_DURABILITY = 10000;
+        public const float CUTTER_EFFICIENCY_T1 = 0.1f;
+        public const float CUTTER_EFFICIENCY_T2 = 0.2f;
+        public const float CUTTER_EFFICIENCY_T3 = 0.3f;
+        public const float CUTTER_EFFICIENCY_T4 = 0.5f;
+        public const float CUTTER_EFFICIENCY_T5 = 4f;
+        public const int DRILLMOTOR_RATE_T0 = 1;
+        public const int DRILLMOTOR_RATE_T1 = 2;
+        public const int DRILLMOTOR_RATE_T2 = 4;
+        public const int DRILLMOTOR_RATE_T3 = 8;
+        public const int DRILLMOTOR_RATE_T4 = 16;
+        public const int DRILLMOTOR_RATE_T5 = 32;
+
+
+        public InfOreExtractor(Segment segment, long x, long y, long z, ushort cube, byte flags, ushort lValue, bool wasLoaded) : base(eSegmentEntity.Mod, SpawnableObjectEnum.OreExtractor,
+            x, y,
             z, cube, flags, lValue, Vector3.zero, segment)
         {
             try
@@ -135,6 +154,11 @@ namespace Tricky.InfiniteOreExtractor
             {
                 Logging.LogException(e);
             }
+        }
+
+
+        public override void OnUpdateRotation(byte newFlags)
+        {
         }
 
 
@@ -185,6 +209,7 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
+
         private bool AttemptAutoUpgrade(int lnID, StorageMachineInterface storageHopper)
         {
             ItemBase itemBase;
@@ -202,6 +227,7 @@ namespace Tricky.InfiniteOreExtractor
             return false;
         }
 
+
         private void LookForSign()
         {
             if (!(FloatingCombatTextManager.instance == null))
@@ -211,34 +237,17 @@ namespace Tricky.InfiniteOreExtractor
                 long num2 = mnY;
                 long num3 = mnZ;
                 if (mnSign % 6 == 0)
-                {
                     num--;
-                }
-
                 if (mnSign % 6 == 1)
-                {
                     num++;
-                }
-
                 if (mnSign % 6 == 2)
-                {
                     num2--;
-                }
-
                 if (mnSign % 6 == 3)
-                {
                     num2++;
-                }
-
                 if (mnSign % 6 == 4)
-                {
                     num3--;
-                }
-
                 if (mnSign % 6 == 5)
-                {
                     num3++;
-                }
 
                 Segment segment = AttemptGetSegment(num, num2, num3);
                 if (segment != null && segment.IsSegmentInAGoodState())
@@ -246,7 +255,7 @@ namespace Tricky.InfiniteOreExtractor
                     Sign sign = segment.SearchEntity(num, num2, num3) as Sign;
                     if (sign != null)
                     {
-                        if (!(mName == string.Empty) && !(mName != sign.mText))
+                        if (mName != string.Empty && mName == sign.mText)
                         {
                             return;
                         }
@@ -257,6 +266,7 @@ namespace Tricky.InfiniteOreExtractor
                 }
             }
         }
+
 
         private void LookForCutterHead()
         {
@@ -309,27 +319,27 @@ namespace Tricky.InfiniteOreExtractor
                         }
 
                         if (AttemptAutoUpgrade(OreExtractor.PLASMA_HEAD_ID, storageMachineInterface) ||
-                            (!AttemptAutoUpgrade(OreExtractor.ORGANIC_HEAD_ID, storageMachineInterface) &&
-                             (AttemptAutoUpgrade(OreExtractor.CRYSTAL_HEAD_ID, storageMachineInterface) || !AttemptAutoUpgrade(OreExtractor.STEEL_HEAD_ID, storageMachineInterface))))
+                            !AttemptAutoUpgrade(OreExtractor.ORGANIC_HEAD_ID, storageMachineInterface) &&
+                            (AttemptAutoUpgrade(OreExtractor.CRYSTAL_HEAD_ID, storageMachineInterface) || !AttemptAutoUpgrade(OreExtractor.STEEL_HEAD_ID, storageMachineInterface)))
                         {
-                            ;
                         }
                     }
                 }
             }
         }
 
+
         public void UpdateState()
         {
             if (meState == eState.eOutOfStorage)
             {
-                if (mnStoredOre + mnDrillRate + mnBonusOre < mnMaxOre)
+                if (mnStoredOre == 0 || mnStoredOre + mnDrillRate + mnBonusOre < mnMaxOre)
                     SetNewState(eState.eMining);
                 mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
             }
             else if (meState == eState.eOutOfStorageVeinDepleted)
             {
-                if (mnStoredOre + mnDrillRate + mnBonusOre < mnMaxOre)
+                if (mnStoredOre == 0 || mnStoredOre + mnDrillRate + mnBonusOre < mnMaxOre)
                     SetNewState(eState.eVeinDepleted);
                 else
                     mrIssueTime += LowFrequencyThread.mrPreviousUpdateTimeStep;
@@ -397,7 +407,7 @@ namespace Tricky.InfiniteOreExtractor
                 float num2 = mrIssueTime;
                 if (meState == eState.eOutOfStorage)
                     num1 = 1800f;
-                if (meState == eState.eOutOfPowerVeinDepleted || meState == eState.eOutOfStorageVeinDepleted || (meState == eState.eVeinDepleted || meState == eState.eDrillStuck))
+                if (meState == eState.eOutOfPowerVeinDepleted || meState == eState.eOutOfStorageVeinDepleted || meState == eState.eVeinDepleted || meState == eState.eDrillStuck)
                     num1 = 60f;
                 if (num2 < num1)
                     num2 = -1f;
@@ -443,11 +453,12 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
+
         public void UpdateFetchEntryPoint()
         {
             EntryX = EntryY = EntryZ = 0L;
             Vector3 directionVector = CubeHelper.GetDirectionVector((byte) (mFlags & 63U));
-            if (CheckNeighbourEntryCube(directionVector))
+            if (CheckNeighborEntryCube(directionVector))
             {
                 if (EntryX == 0L)
                     return;
@@ -457,39 +468,39 @@ namespace Tricky.InfiniteOreExtractor
             {
                 Vector3 forward = SegmentCustomRenderer.GetRotationQuaternion(mFlags) * Vector3.forward;
                 forward.Normalize();
-                if (CheckNeighbourEntryCube(forward))
+                if (CheckNeighborEntryCube(forward))
                     return;
-                if (CheckNeighbourEntryCube(Vector3.forward))
+                if (CheckNeighborEntryCube(Vector3.forward))
                 {
                     if (EntryX == 0L)
                         return;
                     RotateExtractorTo(Vector3.forward);
                 }
-                else if (CheckNeighbourEntryCube(Vector3.back))
+                else if (CheckNeighborEntryCube(Vector3.back))
                 {
                     if (EntryX == 0L)
                         return;
                     RotateExtractorTo(Vector3.back);
                 }
-                else if (CheckNeighbourEntryCube(Vector3.left))
+                else if (CheckNeighborEntryCube(Vector3.left))
                 {
                     if (EntryX == 0L)
                         return;
                     RotateExtractorTo(Vector3.left);
                 }
-                else if (CheckNeighbourEntryCube(Vector3.right))
+                else if (CheckNeighborEntryCube(Vector3.right))
                 {
                     if (EntryX == 0L)
                         return;
                     RotateExtractorTo(Vector3.right);
                 }
-                else if (CheckNeighbourEntryCube(Vector3.down))
+                else if (CheckNeighborEntryCube(Vector3.down))
                 {
                     if (EntryX == 0L)
                         return;
                     RotateExtractorTo(Vector3.down);
                 }
-                else if (CheckNeighbourEntryCube(Vector3.up))
+                else if (CheckNeighborEntryCube(Vector3.up))
                 {
                     if (EntryX == 0L)
                         return;
@@ -504,7 +515,8 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
-        private bool CheckNeighbourEntryCube(Vector3 forward)
+
+        private bool CheckNeighborEntryCube(Vector3 forward)
         {
             long num1 = mnX + (long) forward.x;
             long num2 = mnY + (long) forward.y;
@@ -527,6 +539,7 @@ namespace Tricky.InfiniteOreExtractor
             SetNewState(eState.eSearchingForOre);
             return true;
         }
+
 
         private void RotateExtractorTo(Vector3 direction)
         {
@@ -619,7 +632,9 @@ namespace Tricky.InfiniteOreExtractor
                     if (mrTimeUntilNextOre > 0.0 || !WorldScript.mbIsServer)
                         return;
 
-                    Segment segment = mFrustrum == null ? WorldScript.instance.GetSegment(ExtractionX, ExtractionY, ExtractionZ) : mFrustrum.GetSegment(ExtractionX, ExtractionY, ExtractionZ);
+                    Segment segment = mFrustrum == null
+                        ? WorldScript.instance.GetSegment(ExtractionX, ExtractionY, ExtractionZ)
+                        : mFrustrum.GetSegment(ExtractionX, ExtractionY, ExtractionZ);
                     if (segment == null || !segment.mbInitialGenerationComplete || segment.mbDestroyed)
                     {
                         mrTimeUntilNextOre = mrExtractionTime;
@@ -641,13 +656,13 @@ namespace Tricky.InfiniteOreExtractor
                             num3 = num2 - 1;
                         }
 
-                        if (num2 > 1)
+                        if (num2 > MIN_ORE_VALUE)
                         {
                             ushort num4 = num2;
-                            if (num3 >= 2560)
+                            if (num3 >= MAX_ORE_VALUE)
                                 Debug.LogError("Error, risking overflow - deplete count is " + num3 + " and max ore is " + (ushort) 2560);
-                            if (num2 > 2560)
-                                num2 = 2560;
+                            if (num2 > MAX_ORE_VALUE)
+                                num2 = MAX_ORE_VALUE;
                             ushort lData = (ushort) (num2 - (ushort) num3);
                             mnEstimatedOreLeft = lData;
                             if (lData > num4)
@@ -692,7 +707,7 @@ namespace Tricky.InfiniteOreExtractor
             if (mnCutterDurability > 0)
                 return;
             mnCutterTier = 1;
-            mnCutterDurability = 10000;
+            mnCutterDurability = MAX_DURABILITY;
             CalculateEfficiency();
         }
 
@@ -756,23 +771,24 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
+
         private bool SearchNeighbours()
         {
             return SearchNeighbourLocation(searchLocation.x + 1L, searchLocation.y, searchLocation.z) && (ExtractionX != 0L ||
-                                                                                                                              SearchNeighbourLocation(searchLocation.x - 1L,
-                                                                                                                                  searchLocation.y, searchLocation.z) &&
-                                                                                                                              (ExtractionX != 0L ||
-                                                                                                                               SearchNeighbourLocation(searchLocation.x,
-                                                                                                                                   searchLocation.y + 1L, searchLocation.z) &&
-                                                                                                                               (ExtractionX != 0L ||
-                                                                                                                                SearchNeighbourLocation(searchLocation.x,
-                                                                                                                                    searchLocation.y - 1L, searchLocation.z) &&
-                                                                                                                                (ExtractionX != 0L ||
-                                                                                                                                 SearchNeighbourLocation(searchLocation.x,
-                                                                                                                                     searchLocation.y, searchLocation.z + 1L) &&
-                                                                                                                                 (ExtractionX != 0L ||
-                                                                                                                                  SearchNeighbourLocation(searchLocation.x,
-                                                                                                                                      searchLocation.y, searchLocation.z - 1L))))));
+                                                                                                          SearchNeighbourLocation(searchLocation.x - 1L,
+                                                                                                              searchLocation.y, searchLocation.z) &&
+                                                                                                          (ExtractionX != 0L ||
+                                                                                                           SearchNeighbourLocation(searchLocation.x,
+                                                                                                               searchLocation.y + 1L, searchLocation.z) &&
+                                                                                                           (ExtractionX != 0L ||
+                                                                                                            SearchNeighbourLocation(searchLocation.x,
+                                                                                                                searchLocation.y - 1L, searchLocation.z) &&
+                                                                                                            (ExtractionX != 0L ||
+                                                                                                             SearchNeighbourLocation(searchLocation.x,
+                                                                                                                 searchLocation.y, searchLocation.z + 1L) &&
+                                                                                                             (ExtractionX != 0L ||
+                                                                                                              SearchNeighbourLocation(searchLocation.x,
+                                                                                                                  searchLocation.y, searchLocation.z - 1L))))));
         }
 
 
@@ -823,7 +839,7 @@ namespace Tricky.InfiniteOreExtractor
                         ExtractionZ = z;
                         queuedLocations.Clear();
                     }
-                    else if (visitedLocations.Count < 16384)
+                    else if (visitedLocations.Count < MAX_SEARCH_STEPS)
                         queuedLocations.Enqueue(cubeCoord);
                 }
             }
@@ -941,20 +957,20 @@ namespace Tricky.InfiniteOreExtractor
 
         private void CalculateEfficiency()
         {
-            base_efficiency = 0.1f;
+            base_efficiency = CUTTER_EFFICIENCY_T1;
             switch (mnCutterTier)
             {
                 case 2:
-                    base_efficiency = 0.2f;
+                    base_efficiency = CUTTER_EFFICIENCY_T2;
                     break;
                 case 3:
-                    base_efficiency = 0.3f;
+                    base_efficiency = CUTTER_EFFICIENCY_T3;
                     break;
                 case 4:
-                    base_efficiency = 0.5f;
+                    base_efficiency = CUTTER_EFFICIENCY_T4;
                     break;
                 case 5:
-                    base_efficiency = 4f;
+                    base_efficiency = CUTTER_EFFICIENCY_T5;
                     break;
             }
 
@@ -964,10 +980,12 @@ namespace Tricky.InfiniteOreExtractor
             CalcEfficiencyAndDepleteRate();
         }
 
+
         private bool CheckHardness()
         {
             return TerrainData.GetHardness(mnOreType, 0) <= (mTierUpgrade == 1 ? 450 : 250);
         }
+
 
         private void SetNewState(eState leNewState)
         {
@@ -1035,6 +1053,7 @@ namespace Tricky.InfiniteOreExtractor
             LowPowerTutorial = null;
         }
 
+
         private void LinkToGO()
         {
             if (mWrapper != null && mWrapper.mbHasGameObject)
@@ -1075,6 +1094,7 @@ namespace Tricky.InfiniteOreExtractor
                 component.material.SetColor("_Color", mCubeColor);
             }
         }
+
 
         private void UpdateTutorial()
         {
@@ -1135,6 +1155,7 @@ namespace Tricky.InfiniteOreExtractor
                 return;
             mrTimeUntilNextOre *= 0.5f;
         }
+
 
         public override void UnityUpdate()
         {
@@ -1371,6 +1392,7 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
+
         private void CalcEfficiencyAndDepleteRate()
         {
             mnDrillRate = (int) Mathf.Ceil(GetDrillRateForTier(mnDrillTier) / DifficultySettings.mrResourcesFactor);
@@ -1415,27 +1437,29 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
+
         private int GetDrillRateForTier(int lnDrillTier)
         {
             switch (lnDrillTier)
             {
                 case 0:
-                    return 1;
+                    return DRILLMOTOR_RATE_T0;
                 case 1:
-                    return 2;
+                    return DRILLMOTOR_RATE_T1;
                 case 2:
-                    return 4;
+                    return DRILLMOTOR_RATE_T2;
                 case 3:
-                    return 8;
+                    return DRILLMOTOR_RATE_T3;
                 case 4:
-                    return 16;
+                    return DRILLMOTOR_RATE_T4;
                 case 5:
-                    return 32;
+                    return DRILLMOTOR_RATE_T5;
                 default:
                     Debug.LogError("Error, drill tier " + lnDrillTier + " is illegal!");
                     return -1;
             }
         }
+
 
         public void SetTieredUpgrade(int lnTier)
         {
@@ -1455,12 +1479,14 @@ namespace Tricky.InfiniteOreExtractor
             mrPowerUsage += (mnDrillRate - 1) / 2f;
         }
 
+
         public string GetDrillMotorName()
         {
             if (mnDrillTier == 0)
                 return PersistentSettings.GetString("Economy_Drill_Motor");
             return ItemManager.GetItemName(GetDrillMotorID());
         }
+
 
         public string GetCutterHeadName()
         {
@@ -1472,25 +1498,26 @@ namespace Tricky.InfiniteOreExtractor
 
         public void SetCutterUpgrade(ItemDurability cutterHead)
         {
-            int mnCutterTier = this.mnCutterTier;
+            int cutterTier = mnCutterTier;
             if (cutterHead == null)
             {
-                this.mnCutterTier = 1;
-                mnCutterDurability = 10000;
+                mnCutterTier = 1;
+                mnCutterDurability = MAX_DURABILITY;
             }
             else
             {
-                this.mnCutterTier = OreExtractor.GetCutterTierFromItem(cutterHead.mnItemID);
+                mnCutterTier = OreExtractor.GetCutterTierFromItem(cutterHead.mnItemID);
                 mnCutterDurability = cutterHead.mnCurrentDurability;
             }
 
-            if (this.mnCutterTier > mnCutterTier && mDistanceToPlayer < 128.0 && mDotWithPlayerForwards > 0.0)
+            if (mnCutterTier > cutterTier && mDistanceToPlayer < 128.0 && mDotWithPlayerForwards > 0.0)
                 FloatingCombatTextManager.instance.QueueText(mnX, mnY + 1L, mnZ, 1.05f, PersistentSettings.GetString("Upgraded"), Color.cyan, 1f, 64f);
             CalculateEfficiency();
             if (meState == eState.eDrillStuck && CheckHardness())
                 meState = eState.eSearchingForOre;
             CalcEfficiencyAndDepleteRate();
         }
+
 
         public static int GetCutterTierFromItem(int itemID)
         {
@@ -1503,10 +1530,12 @@ namespace Tricky.InfiniteOreExtractor
             return itemID == OreExtractor.PLASMA_HEAD_ID ? 5 : 1;
         }
 
+
         public override bool ShouldSave()
         {
             return true;
         }
+
 
         public override void Write(BinaryWriter writer)
         {
@@ -1550,6 +1579,7 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
+
         public override void Read(BinaryReader reader, int entityVersion)
         {
             try
@@ -1565,7 +1595,7 @@ namespace Tricky.InfiniteOreExtractor
                 if (mnCutterTier == 0)
                     mnCutterTier = 1;
                 if (mnCutterTier == 1)
-                    mnCutterDurability = 10000;
+                    mnCutterDurability = MAX_DURABILITY;
                 if (!mSegment.mbValidateOnly)
                     CalculateEfficiency();
                 reader.ReadInt64();
@@ -1578,9 +1608,12 @@ namespace Tricky.InfiniteOreExtractor
                     SetTieredUpgrade(mnDrillTier);
                 mbReportOffline = reader.ReadBoolean();
                 bool flag = reader.ReadBoolean();
+
                 flag = reader.ReadBoolean();
                 flag = reader.ReadBoolean();
+
                 mrIssueTime = reader.ReadSingle();
+
                 double num1 = reader.ReadSingle();
                 double num2 = reader.ReadSingle();
                 double num3 = reader.ReadSingle();
@@ -1612,19 +1645,21 @@ namespace Tricky.InfiniteOreExtractor
             return true;
         }
 
+
         public override void WriteNetworkUpdate(BinaryWriter writer)
         {
-            try { 
-            base.WriteNetworkUpdate(writer);
-            writer.Write((int) meState);
-            writer.Write(mrTimeUntilNextOre);
-            writer.Write(mnEstimatedOreLeft);
-            writer.Write(mrEfficiency);
-            writer.Write(mrWorkTime);
-            writer.Write(mrIdleTime);
-            writer.Write(EntryX);
-            writer.Write(EntryY);
-            writer.Write(EntryZ);
+            try
+            {
+                base.WriteNetworkUpdate(writer);
+                writer.Write((int) meState);
+                writer.Write(mrTimeUntilNextOre);
+                writer.Write(mnEstimatedOreLeft);
+                writer.Write(mrEfficiency);
+                writer.Write(mrWorkTime);
+                writer.Write(mrIdleTime);
+                writer.Write(EntryX);
+                writer.Write(EntryY);
+                writer.Write(EntryZ);
             }
             catch (Exception e)
             {
@@ -1632,25 +1667,28 @@ namespace Tricky.InfiniteOreExtractor
             }
         }
 
+
         public override void ReadNetworkUpdate(BinaryReader reader)
         {
-            try { 
-            base.ReadNetworkUpdate(reader);
-            meState = (eState) reader.ReadInt32();
-            mrTimeUntilNextOre = reader.ReadSingle();
-            mnEstimatedOreLeft = reader.ReadInt32();
-            mrEfficiency = reader.ReadSingle();
-            mrWorkTime = reader.ReadSingle();
-            mrIdleTime = reader.ReadSingle();
-            EntryX = reader.ReadInt64();
-            EntryY = reader.ReadInt64();
-            EntryZ = reader.ReadInt64();
+            try
+            {
+                base.ReadNetworkUpdate(reader);
+                meState = (eState) reader.ReadInt32();
+                mrTimeUntilNextOre = reader.ReadSingle();
+                mnEstimatedOreLeft = reader.ReadInt32();
+                mrEfficiency = reader.ReadSingle();
+                mrWorkTime = reader.ReadSingle();
+                mrIdleTime = reader.ReadSingle();
+                EntryX = reader.ReadInt64();
+                EntryY = reader.ReadInt64();
+                EntryZ = reader.ReadInt64();
             }
             catch (Exception e)
             {
                 Logging.LogException(e);
             }
         }
+
 
         public bool DropStoredOre()
         {
@@ -1662,6 +1700,7 @@ namespace Tricky.InfiniteOreExtractor
             return true;
         }
 
+
         public ItemBase GetStoredOre()
         {
             if (mnOreType == 0)
@@ -1671,6 +1710,7 @@ namespace Tricky.InfiniteOreExtractor
             return ItemManager.SpawnCubeStack(mnOreType, TerrainData.GetDefaultValue(mnOreType), mnStoredOre);
         }
 
+
         public void ClearStoredOre()
         {
             mnStoredOre = 0;
@@ -1678,12 +1718,14 @@ namespace Tricky.InfiniteOreExtractor
             RequestImmediateNetworkUpdate();
         }
 
+
         public int GetCutterHeadID()
         {
             if (mnCutterTier > 1)
                 return 198 + mnCutterTier;
             return -1;
         }
+
 
         public void DropCurrentCutterHead()
         {
@@ -1698,19 +1740,23 @@ namespace Tricky.InfiniteOreExtractor
             }
 
             mnCutterTier = 1;
-            mnCutterDurability = 10000;
+            mnCutterDurability = MAX_DURABILITY;
             CalculateEfficiency();
             MarkDirtyDelayed();
         }
+
 
         public ItemBase GetCutterHead()
         {
             if (mnCutterTier <= 1)
                 return null;
+
             ItemDurability itemDurability = ItemManager.SpawnItem(GetCutterHeadID()) as ItemDurability;
-            itemDurability.mnCurrentDurability = mnCutterDurability;
+            if (itemDurability!=null)
+                itemDurability.mnCurrentDurability = mnCutterDurability;
             return itemDurability;
         }
+
 
         public bool IsValidCutterHead(ItemBase newCutterHeadItem)
         {
@@ -1718,6 +1764,7 @@ namespace Tricky.InfiniteOreExtractor
                 return newCutterHeadItem.mnItemID <= OreExtractor.PLASMA_HEAD_ID;
             return false;
         }
+
 
         public void SwapCutterHead(ItemBase newCutterHeadItem)
         {
@@ -1734,6 +1781,7 @@ namespace Tricky.InfiniteOreExtractor
                 MarkDirtyDelayed();
             }
         }
+
 
         public bool AttemptUpgradeCutterHead(Player player)
         {
@@ -1769,12 +1817,14 @@ namespace Tricky.InfiniteOreExtractor
             return false;
         }
 
+
         public int GetDrillMotorID()
         {
             if (mnDrillTier > 0)
                 return 2999 + mnDrillTier;
             return -1;
         }
+
 
         public void DropCurrentDrillMotor()
         {
@@ -1797,12 +1847,14 @@ namespace Tricky.InfiniteOreExtractor
             return mnDrillTier != newMotorItem.mnItemID - 2999;
         }
 
+
         public ItemBase GetMotor()
         {
             if (mnDrillTier > 0)
                 return ItemManager.SpawnItem(GetDrillMotorID());
             return null;
         }
+
 
         public void SwapMotor(ItemBase newMotorItem)
         {
@@ -1821,6 +1873,7 @@ namespace Tricky.InfiniteOreExtractor
                 MarkDirtyDelayed();
             }
         }
+
 
         public bool AttemptUpgradeDrillMotor(Player player)
         {
@@ -1845,6 +1898,7 @@ namespace Tricky.InfiniteOreExtractor
             return true;
         }
 
+
         public override void OnDelete()
         {
             if (WorldScript.mbIsServer)
@@ -1856,6 +1910,7 @@ namespace Tricky.InfiniteOreExtractor
 
             base.OnDelete();
         }
+
 
         public bool PlayerExtractStoredOre(Player player)
         {
@@ -1874,15 +1929,18 @@ namespace Tricky.InfiniteOreExtractor
             return mrMaxPower - mrCurrentPower;
         }
 
+
         public float GetMaximumDeliveryRate()
         {
             return 10f + mnDrillRate * 3;
         }
 
+
         public float GetMaxPower()
         {
             return mrMaxPower;
         }
+
 
         public bool DeliverPower(float amount)
         {
@@ -1893,10 +1951,12 @@ namespace Tricky.InfiniteOreExtractor
             return true;
         }
 
+
         public bool WantsPowerFromEntity(SegmentEntity entity)
         {
             return true;
         }
+
 
         public override HoloMachineEntity CreateHolobaseEntity(Holobase holobase)
         {
@@ -1919,7 +1979,7 @@ namespace Tricky.InfiniteOreExtractor
                 GameObject gameObject1 = holoMachineEntity.VisualisationObjects[0].transform.Search("Drill Rot").gameObject;
                 gameObject1.GetComponent<RotateConstantlyScript>().ZRot *= 0.9f;
                 float r = 1f;
-                if (holobase.mnUpdates % 60 < 30)
+                if (holobase.mnUpdates % 60 < EXTRACTION_TIME)
                     r = 0.0f;
                 Color lCol = new Color(r, 0.0f, 0.0f, 1f);
                 if (meState == eState.eDrillStuck)
@@ -1932,12 +1992,14 @@ namespace Tricky.InfiniteOreExtractor
                 GameObject gameObject2 = gameObject1.transform.Search("Drill GFX").gameObject;
                 holobase.SetTint(gameObject2, new Color(1f - r, 0.0f, 0.0f, 1f));
             }
+
             if (ErroryExtractor != this)
                 return;
             int num = mnLowFrequencyUpdates % 3 + 1;
             holoMachineEntity.VisualisationObjects[0].transform.localScale = new Vector3(num, num, num);
             holobase.SetColour(holoMachineEntity.VisualisationObjects[0], new Color(num, 0.1f, 0.1f));
         }
+
 
         public string Name
         {
@@ -2022,6 +2084,7 @@ namespace Tricky.InfiniteOreExtractor
             set { mrCurrentPower = value; }
         }
 
+
         public void ProcessStorageSupplier(StorageMachineInterface storage)
         {
             if (mnStoredOre <= 0)
@@ -2032,6 +2095,7 @@ namespace Tricky.InfiniteOreExtractor
                 return;
             mrIssueTime = 0.0f;
             ARTHERPetSurvival.instance.GotOre(mnOreType);
+            InfExtractorMachineWindow.SetDirty();
         }
 
 
@@ -2054,17 +2118,17 @@ namespace Tricky.InfiniteOreExtractor
             string str4 = extractor.meState != eState.eDrillStuck
                 ? (extractor.mnOreType != (ushort) 0
                       ? str3 + "\n" + string.Format(PersistentSettings.GetString("Next_X_in_X"), str2, extractor.mrTimeUntilNextOre.ToString("F0"))
-                      : str3 + "\n" + PersistentSettings.GetString("OE_Searching")).ToString() + PersistentSettings.GetString("Total_Stored") + extractor.mnStoredOre
+                      : str3 + "\n" + PersistentSettings.GetString("OE_Searching")) + PersistentSettings.GetString("Total_Stored") + extractor.mnStoredOre
                 : str3 + "\n" + PersistentSettings.GetString("Drill_Stuck") + "." + cutterHeadName + " " + PersistentSettings.GetString("Cant_Dig") + "\n" + str2 + ". " +
                   PersistentSettings.GetString("Fit_Head");
-            float num1 = extractor.mnDrillRate / 1f * DifficultySettings.mrResourcesFactor;
+            
             float mnDrillRate = extractor.mnDrillRate;
             string str5 = str4 + string.Format("\n{0}. {1}: {2:P0}", extractor.GetDrillMotorName(), PersistentSettings.GetString("Drill_Rate"), mnDrillRate);
-            float num2 = extractor.mnCutterDurability / 10000f;
+            float num2 = extractor.mnCutterDurability / MAX_DURABILITY;
             if (extractor.mnCutterTier == 0)
                 str5 += string.Format("\n{0} : {1:P0} {2}", cutterHeadName, num2, PersistentSettings.GetString("Durability"));
-            int num3 = (int) (extractor.mnDrillRate * 60.0 / 30.0);
-            float num4 = extractor.mrPowerUsage * DifficultySettings.mrResourcesFactor;
+
+
             string str6 = str5 + "\n" + PersistentSettings.GetString("Average_PPS") + " : " + extractor.mrAveragePPS.ToString("F2");
             float num5 = extractor.mrWorkTime + extractor.mrIdleTime;
             float num6 = extractor.mrWorkTime / num5;
